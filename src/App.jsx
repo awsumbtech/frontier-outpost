@@ -1,0 +1,63 @@
+import { useState, useEffect } from "react";
+import { STORY_CHAPTERS } from "./data/story";
+import useGameState from "./hooks/useGameState";
+import useMission from "./hooks/useMission";
+import SquadTab from "./components/tabs/SquadTab";
+import MissionTab from "./components/tabs/MissionTab";
+import InventoryTab from "./components/tabs/InventoryTab";
+import CommsTab from "./components/tabs/CommsTab";
+import RecruitTab from "./components/tabs/RecruitTab";
+import GearModal from "./components/shared/GearModal";
+import IntroScreen from "./components/shared/IntroScreen";
+import NewGameConfirm from "./components/shared/NewGameConfirm";
+
+const TABS = ["Squad", "Mission", "Comms", "Inventory", "Recruit"];
+
+export default function App() {
+  const [tab, setTab] = useState("Squad");
+
+  const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
+
+  const gs = useGameState();
+  const { game, updateGame, loadGame, setGame, newGame,
+    showIntro, setShowIntro,
+    selectedOp, setSelectedOp, gearModal, setGearModal,
+    invFilter, setInvFilter, stimTarget, setStimTarget,
+    equipGear, unequipGear, scrapGear, learnSkill,
+    recruitOp, dismissOp, buyStim, useStim } = gs;
+
+  const ms = useMission(game, setGame, updateGame, setTab);
+  const { mission, combatLog, decision, missionResult, logRef,
+    startMission, advanceMission, handleDecision, resetMission, advanceDebrief } = ms;
+
+  useEffect(() => { loadGame(); }, [loadGame]);
+
+  if (showIntro) {
+    return <IntroScreen onBegin={() => setShowIntro(false)} />;
+  }
+
+  return (
+    <div className="app">
+      <div className="top-bar">
+        <h1>Frontier Outpost</h1>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}><span className="meta">M:{game.missionsCompleted}</span><span className="credits">◈{game.credits}¢</span><button className="btn btn-sm top-bar-new-game" onClick={()=>setShowNewGameConfirm(true)}>New Game</button></div>
+      </div>
+      <div className="nav">{TABS.map(t=>{
+        const icons={Squad:"👥",Mission:"⚔",Comms:"📡",Inventory:"🎒",Recruit:"➕"};
+        const unread=t==="Comms"?STORY_CHAPTERS.flatMap(ch=>ch.beats.filter(b=>game.missionsCompleted>=b.at&&!game.storyBeatsRead[`${ch.id}-${b.at}`])).length:0;
+        return(<button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>
+          <span className="nav-icon">{icons[t]}</span><span className="nav-label">{t}{unread>0&&<span style={{background:"var(--danger)",color:"#fff",fontSize:8,padding:"0 4px",borderRadius:8,marginLeft:3,fontFamily:"'Share Tech Mono',monospace",verticalAlign:"middle"}}>{unread}</span>}</span>
+        </button>);
+      })}</div>
+      <div className="content" style={tab==="Mission"&&mission?{padding:6,display:"flex",flexDirection:"column"}:{}}>
+        {tab==="Squad"&&<SquadTab game={game} selectedOp={selectedOp} setSelectedOp={setSelectedOp} setGearModal={setGearModal} unequipGear={unequipGear} learnSkill={learnSkill} dismissOp={dismissOp}/>}
+        {tab==="Mission"&&<MissionTab game={game} mission={mission} combatLog={combatLog} decision={decision} missionResult={missionResult} logRef={logRef} startMission={startMission} advanceMission={advanceMission} handleDecision={handleDecision} resetMission={resetMission} advanceDebrief={advanceDebrief}/>}
+        {tab==="Comms"&&<CommsTab game={game} updateGame={updateGame}/>}
+        {tab==="Inventory"&&<InventoryTab game={game} invFilter={invFilter} setInvFilter={setInvFilter} stimTarget={stimTarget} setStimTarget={setStimTarget} buyStim={buyStim} useStim={useStim} scrapGear={scrapGear}/>}
+        {tab==="Recruit"&&<RecruitTab game={game} recruitOp={recruitOp}/>}
+      </div>
+      <GearModal gearModal={gearModal} setGearModal={setGearModal} game={game} equipGear={equipGear}/>
+      {showNewGameConfirm && <NewGameConfirm onConfirm={()=>{setShowNewGameConfirm(false);newGame();}} onCancel={()=>setShowNewGameConfirm(false)}/>}
+    </div>
+  );
+}

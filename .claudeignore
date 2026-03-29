@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.venv/
+vendor/
+__pycache__/
+
+# Build artifacts
+dist/
+build/
+.next/
+out/
+coverage/
+
+# Large/binary files
+*.lock
+*.min.js
+*.min.css
+*.map
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.eot
+
+# Environment
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
