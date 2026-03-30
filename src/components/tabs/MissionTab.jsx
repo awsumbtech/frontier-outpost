@@ -1,10 +1,9 @@
 import { MISSIONS } from '../../data/missions';
 import { STORY_CHAPTERS } from '../../data/story';
 import { RARITY_NAMES, RARITY_COLORS } from '../../data/constants';
-import CombatAlly from '../combat/CombatAlly';
-import CombatEnemy from '../combat/CombatEnemy';
+import BattleScene from '../combat/BattleScene';
 
-export default function MissionTab({ game, mission, combatLog, decision, missionResult, logRef, startMission, advanceMission, handleDecision, resetMission, advanceDebrief }) {
+export default function MissionTab({ game, mission, combatLog, decision, missionResult, logRef, animation, advanceAnimation, skipAnimation, startMission, advanceMission, handleDecision, resetMission, advanceDebrief }) {
   if (!mission) {
     const avg = game.squad.length>0?Math.round(game.squad.reduce((s,o)=>s+o.level,0)/game.squad.length):1;
     const completed = game.completedMissions || {};
@@ -76,26 +75,17 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
   }
 
   return (<div className="mission-layout">
-    <div className="mission-top">
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-        <span style={{color:"var(--accent)",fontFamily:"'Share Tech Mono',monospace",fontSize:"var(--font-sm)"}}>{mission.type.name}</span>
-        <span style={{fontSize:"var(--font-xs)",color:"var(--text2)"}}>Enc {mission.currentEncounter}/{mission.totalEncounters} · Rnd {mission.roundNum}</span>
-      </div>
-      <div className="section-label">Squad</div>
-      <div className="units-row">{game.squad.map(op=><CombatAlly key={op.id} op={op}/>)}</div>
-      {mission.enemies&&mission.enemies.some(e=>e.alive)&&<>
-        <div className="section-label">Hostiles</div>
-        <div className="units-row">{mission.enemies.filter(e=>e.alive).map(e=><CombatEnemy key={e.id} e={e}/>)}</div>
-      </>}
-    </div>
-    <div className="mission-log-area">
-      <div className="combat-log" ref={logRef}>
-        {combatLog.map((entry,i)=>{
-          if (typeof entry==="string") return <div key={i} className="log-line log-info">{entry||"\u00A0"}</div>;
-          return <div key={i} className={`log-line log-${entry.type}`}>{entry.text}</div>;
-        })}
-      </div>
-    </div>
+    <BattleScene
+      squad={game.squad}
+      enemies={mission.enemies}
+      animation={animation}
+      currentEncounter={mission.currentEncounter}
+      totalEncounters={mission.totalEncounters}
+      roundNum={mission.roundNum}
+      combatLog={combatLog}
+      logRef={logRef}
+      missionTypeName={mission.type.name}
+    />
     <div className="sticky-bar">
       {decision&&mission.phase==="decision"&&(
         <div className="decision-panel">
@@ -155,7 +145,9 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
 
       <div style={{display:"flex",gap:5}}>
         {mission.phase==="briefing"&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceMission}>Begin Mission</button>}
-        {mission.phase==="combat"&&!decision&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceMission}>Next Round ▸</button>}
+        {mission.phase==="combat"&&!decision&&!animation&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceMission}>Next Round ▸</button>}
+        {animation&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceAnimation}>Next ▸</button>}
+        {animation&&<button className="btn" onClick={skipAnimation}>Skip ▸▸</button>}
         {mission.phase==="result"&&mission.debriefPhase==="stats"&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceDebrief}>Continue</button>}
         {mission.phase==="result"&&mission.debriefPhase==="comms"&&(()=>{
           const beats = missionResult?.newBeats||[];

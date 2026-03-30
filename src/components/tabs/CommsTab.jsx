@@ -3,16 +3,15 @@ import { STORY_CHAPTERS } from '../../data/story';
 export default function CommsTab({ game, updateGame }) {
   const mc = game.missionsCompleted;
   const unlockedChapters = STORY_CHAPTERS.filter(ch => mc >= ch.unlockAt);
-  const allBeats = [];
 
+  const unreadKeys = [];
   for (const ch of unlockedChapters) {
-    allBeats.push({ type: "chapter", chapter: ch });
     for (const beat of ch.beats) {
-      if (mc >= beat.at) allBeats.push({ type: "beat", beat, chapterId: ch.id });
+      if (mc >= beat.at && !game.storyBeatsRead[`${ch.id}-${beat.at}`]) {
+        unreadKeys.push(`${ch.id}-${beat.at}`);
+      }
     }
   }
-
-  const unreadKeys = allBeats.filter(b => b.type === "beat" && !game.storyBeatsRead[`${b.chapterId}-${b.beat.at}`]).map(b => `${b.chapterId}-${b.beat.at}`);
   if (unreadKeys.length > 0) {
     setTimeout(() => {
       updateGame(g => {
@@ -31,56 +30,56 @@ export default function CommsTab({ game, updateGame }) {
     </div>);
   }
 
-  return (<div>
-    {unlockedChapters.map((ch, ci) => {
-      const isLatest = ci === unlockedChapters.length - 1;
-      return (<div key={ch.id} style={{marginBottom:12}}>
-        <div style={{
-          background: isLatest ? "linear-gradient(135deg, rgba(0,212,255,0.08), rgba(192,132,252,0.05))" : "var(--bg2)",
-          border: `1px solid ${isLatest ? "rgba(0,212,255,0.3)" : "var(--border)"}`,
-          borderRadius: 6, padding: 10, marginBottom: 6
-        }}>
-          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-            <span style={{color:"var(--accent)",fontFamily:"'Share Tech Mono',monospace",fontSize:10,letterSpacing:1}}>CH.{ci+1}</span>
-            <span style={{fontSize:13,fontWeight:700,color:isLatest?"var(--accent)":"var(--text)"}}>{ch.title}</span>
-          </div>
-          <div style={{fontSize:11,color:"var(--text2)",lineHeight:1.4}}>{ch.intro}</div>
+  const totalChapters = STORY_CHAPTERS.length;
+
+  return (<div className="comms-tab">
+    {STORY_CHAPTERS.map((ch, ci) => {
+      const isUnlocked = mc >= ch.unlockAt;
+      const isComplete = ci < unlockedChapters.length - 1 && isUnlocked;
+      const isCurrent = ci === unlockedChapters.length - 1 && isUnlocked;
+      const isLocked = !isUnlocked;
+
+      const status = isComplete ? "CLEARED" : isCurrent ? "ACTIVE" : "CLASSIFIED";
+      const statusColor = isComplete ? "var(--success)" : isCurrent ? "var(--accent)" : "var(--text2)";
+
+      return (<div key={ch.id} className={`comms-doc${isLocked ? " comms-locked" : ""}`} style={{'--doc-color': statusColor}}>
+        <div className="comms-doc-header">
+          <span className="comms-ch-label">CH.{ci + 1} — {ch.title.toUpperCase()}</span>
+          <span className="comms-status-stamp">{status}</span>
         </div>
 
-        {ch.beats.filter(b => mc >= b.at).map((beat, bi) => {
-          const key = `${ch.id}-${beat.at}`;
-          const isNew = !game.storyBeatsRead[key];
-          return (<div key={bi} style={{
-            background: isNew ? "rgba(0,212,255,0.04)" : "var(--bg3)",
-            border: `1px solid ${isNew ? "rgba(0,212,255,0.2)" : "var(--border)"}`,
-            borderRadius: 5, padding: 8, marginBottom: 4, marginLeft: 12,
-            borderLeft: `2px solid ${isNew ? "var(--accent)" : "var(--border2)"}`
-          }}>
-            <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
-              <span style={{fontSize:10,color:"var(--accent)",fontFamily:"'Share Tech Mono',monospace"}}>◈</span>
-              <span style={{fontSize:11,fontWeight:600,color:isNew?"var(--accent)":"var(--text)"}}>{beat.sender}</span>
-              {isNew && <span style={{fontSize:8,background:"rgba(0,212,255,0.15)",color:"var(--accent)",padding:"0 4px",borderRadius:2,fontFamily:"'Share Tech Mono',monospace"}}>NEW</span>}
-              <span style={{fontSize:8,color:"var(--text2)",marginLeft:"auto",fontFamily:"'Share Tech Mono',monospace"}}>M{beat.at}</span>
+        {isLocked ? (
+          <div className="comms-classified">COMPLETE CHAPTER {ci} TO UNLOCK</div>
+        ) : (
+          <>
+            <div className="comms-intro">{ch.intro}</div>
+            <div className="comms-timeline">
+              {ch.beats.filter(b => mc >= b.at).map((beat, bi) => {
+                const key = `${ch.id}-${beat.at}`;
+                const isNew = !game.storyBeatsRead[key];
+                return (<div key={bi} className={`comms-beat${isNew ? " comms-beat-new" : ""}`}>
+                  <div className="comms-beat-header">
+                    <span className="comms-sender">{beat.sender}</span>
+                    {isNew && <span className="comms-new-badge">NEW</span>}
+                    <span className="comms-mission-tag">M{beat.at}</span>
+                  </div>
+                  <div className="comms-beat-text">{beat.text}</div>
+                </div>);
+              })}
             </div>
-            <div style={{fontSize:11,color:"var(--text)",lineHeight:1.4}}>{beat.text}</div>
-          </div>);
-        })}
+          </>
+        )}
       </div>);
     })}
 
-    {mc < 19 && (<div style={{
-      textAlign:"center",padding:12,color:"var(--text2)",fontSize:10,
-      border:"1px dashed var(--border)",borderRadius:5,marginTop:8
-    }}>
-      <span style={{fontFamily:"'Share Tech Mono',monospace"}}>
-        {(() => {
-          const nextBeat = STORY_CHAPTERS.flatMap(ch => ch.beats).find(b => b.at > mc);
-          const nextChapter = STORY_CHAPTERS.find(ch => ch.unlockAt > mc);
-          if (nextChapter && (!nextBeat || nextChapter.unlockAt <= nextBeat.at)) return `Next chapter unlocks at mission ${nextChapter.unlockAt}`;
-          if (nextBeat) return `Next transmission at mission ${nextBeat.at}`;
-          return "Story complete";
-        })()}
-      </span>
+    {mc < 19 && (<div className="comms-hint">
+      {(() => {
+        const nextBeat = STORY_CHAPTERS.flatMap(ch => ch.beats).find(b => b.at > mc);
+        const nextChapter = STORY_CHAPTERS.find(ch => ch.unlockAt > mc);
+        if (nextChapter && (!nextBeat || nextChapter.unlockAt <= nextBeat.at)) return `Next chapter unlocks at mission ${nextChapter.unlockAt}`;
+        if (nextBeat) return `Next transmission at mission ${nextBeat.at}`;
+        return "Story complete";
+      })()}
     </div>)}
   </div>);
 }

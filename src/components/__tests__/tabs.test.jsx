@@ -64,7 +64,7 @@ describe('MissionTab', () => {
   it('renders mission select when no active mission', () => {
     const game = makeGame();
     const { container } = render(
-      <MissionTab game={game} mission={null} combatLog={[]} decision={null} missionResult={null} logRef={{ current: null }} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} />
+      <MissionTab game={game} mission={null} combatLog={[]} decision={null} missionResult={null} logRef={{ current: null }} animation={null} skipAnimation={vi.fn()} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} />
     );
     expect(container.textContent).toContain('Avg Level');
     expect(container.textContent).toContain('0 completed');
@@ -86,10 +86,10 @@ describe('MissionTab', () => {
     };
     const log = [{ text: 'Round 1', type: 'round' }];
     const { container } = render(
-      <MissionTab game={game} mission={mission} combatLog={log} decision={null} missionResult={null} logRef={{ current: null }} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} />
+      <MissionTab game={game} mission={mission} combatLog={log} decision={null} missionResult={null} logRef={{ current: null }} animation={null} skipAnimation={vi.fn()} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} />
     );
     expect(container.textContent).toContain(MISSIONS[0].name);
-    expect(container.textContent).toContain('Enc 1/3');
+    expect(container.textContent).toContain('1/3');
     expect(container.textContent).toContain('Next Round');
   });
 
@@ -109,7 +109,7 @@ describe('MissionTab', () => {
     const result = { success: true, xp: 100, credits: 50, loot: [], combatStats: mission.combatStats, newBeats: [] };
     const advanceDebrief = vi.fn();
     const { container } = render(
-      <MissionTab game={game} mission={mission} combatLog={[]} decision={null} missionResult={result} logRef={{ current: null }} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={advanceDebrief} />
+      <MissionTab game={game} mission={mission} combatLog={[]} decision={null} missionResult={result} logRef={{ current: null }} animation={null} skipAnimation={vi.fn()} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={advanceDebrief} />
     );
     expect(container.textContent).toContain('MISSION COMPLETE');
     expect(container.textContent).toContain('5'); // rounds
@@ -137,7 +137,7 @@ describe('MissionTab', () => {
     };
     const result = { success: true, xp: 100, credits: 50, loot: [], combatStats: mission.combatStats, newBeats: [{ sender: 'CMD Vasquez', text: 'Good work on the sweep.', chapterId: 'ch1', at: 1 }] };
     const { container } = render(
-      <MissionTab game={game} mission={mission} combatLog={[]} decision={null} missionResult={result} logRef={{ current: null }} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} />
+      <MissionTab game={game} mission={mission} combatLog={[]} decision={null} missionResult={result} logRef={{ current: null }} animation={null} skipAnimation={vi.fn()} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} />
     );
     expect(container.textContent).toContain('INCOMING TRANSMISSION');
     expect(container.textContent).toContain('CMD Vasquez');
@@ -152,9 +152,9 @@ describe('InventoryTab', () => {
     const { container } = render(
       <InventoryTab game={game} invFilter="all" setInvFilter={vi.fn()} stimTarget={null} setStimTarget={vi.fn()} buyStim={vi.fn()} useStim={vi.fn()} scrapGear={vi.fn()} />
     );
-    expect(container.textContent).toContain('Stims (1)');
-    expect(container.textContent).toContain('Gear (2)');
-    expect(container.textContent).toContain('Scrap');
+    expect(container.textContent).toContain('COMBAT STIMS');
+    expect(container.textContent).toContain('GEAR LOCKER');
+    expect(container.textContent).toContain('2 ITEMS');
   });
 
   it('filters gear by type', () => {
@@ -163,8 +163,8 @@ describe('InventoryTab', () => {
       <InventoryTab game={game} invFilter="armor" setInvFilter={vi.fn()} stimTarget={null} setStimTarget={vi.fn()} buyStim={vi.fn()} useStim={vi.fn()} scrapGear={vi.fn()} />
     );
     // Should only show armor items
-    const invItems = container.querySelectorAll('.inv-item');
-    expect(invItems.length).toBe(1); // only the 1 armor piece
+    const gearCards = container.querySelectorAll('.gear-card');
+    expect(gearCards.length).toBe(1); // only the 1 armor piece
   });
 
   it('shows empty state when no gear', () => {
@@ -184,7 +184,7 @@ describe('CommsTab', () => {
       <CommsTab game={game} updateGame={vi.fn()} />
     );
     expect(container.textContent).toContain('CH.1');
-    expect(container.textContent).toContain('Planetfall');
+    expect(container.textContent).toContain('PLANETFALL');
   });
 
   it('shows story content when missions completed', () => {

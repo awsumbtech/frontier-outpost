@@ -10,13 +10,17 @@ import RecruitTab from "./components/tabs/RecruitTab";
 import GearModal from "./components/shared/GearModal";
 import IntroScreen from "./components/shared/IntroScreen";
 import NewGameConfirm from "./components/shared/NewGameConfirm";
+import SettingsModal from "./components/shared/SettingsModal";
 
 const TABS = ["Squad", "Mission", "Comms", "Inventory", "Recruit"];
+const TAB_DISPLAY = { Squad: "COMMAND", Mission: "OPS", Comms: "COMMS", Inventory: "ARMORY", Recruit: "RECRUIT" };
+const TAB_ICONS = { Squad: "⊞", Mission: "◎", Comms: "◇", Inventory: "⬡", Recruit: "＋" };
 
 export default function App() {
   const [tab, setTab] = useState("Squad");
 
   const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const gs = useGameState();
   const { game, updateGame, loadGame, setGame, newGame,
@@ -24,10 +28,11 @@ export default function App() {
     selectedOp, setSelectedOp, gearModal, setGearModal,
     invFilter, setInvFilter, stimTarget, setStimTarget,
     equipGear, unequipGear, scrapGear, learnSkill,
-    recruitOp, dismissOp, buyStim, useStim } = gs;
+    recruitOp, dismissOp, buyStim, useStim, updateSettings } = gs;
 
   const ms = useMission(game, setGame, updateGame, setTab);
   const { mission, combatLog, decision, missionResult, logRef,
+    animation, advanceAnimation, skipAnimation,
     startMission, advanceMission, handleDecision, resetMission, advanceDebrief } = ms;
 
   useEffect(() => { loadGame(); }, [loadGame]);
@@ -40,24 +45,24 @@ export default function App() {
     <div className="app">
       <div className="top-bar">
         <h1>Frontier Outpost</h1>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}><span className="meta">M:{game.missionsCompleted}</span><span className="credits">◈{game.credits}¢</span><button className="btn btn-sm top-bar-new-game" onClick={()=>setShowNewGameConfirm(true)}>New Game</button></div>
+        <div className="status-group"><span className="meta">M:{game.missionsCompleted}/20</span><span className="credits">◈{game.credits}</span><button className="btn btn-sm top-bar-settings" onClick={()=>setShowSettings(true)}>⚙</button><button className="btn btn-sm top-bar-new-game" onClick={()=>setShowNewGameConfirm(true)}>New Game</button></div>
       </div>
       <div className="nav">{TABS.map(t=>{
-        const icons={Squad:"👥",Mission:"⚔",Comms:"📡",Inventory:"🎒",Recruit:"➕"};
         const unread=t==="Comms"?STORY_CHAPTERS.flatMap(ch=>ch.beats.filter(b=>game.missionsCompleted>=b.at&&!game.storyBeatsRead[`${ch.id}-${b.at}`])).length:0;
         return(<button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>
-          <span className="nav-icon">{icons[t]}</span><span className="nav-label">{t}{unread>0&&<span style={{background:"var(--danger)",color:"#fff",fontSize:8,padding:"0 4px",borderRadius:8,marginLeft:3,fontFamily:"'Share Tech Mono',monospace",verticalAlign:"middle"}}>{unread}</span>}</span>
+          <span className="nav-icon">{TAB_ICONS[t]}</span><span className="nav-label">{TAB_DISPLAY[t]}{unread>0&&<span style={{background:"var(--danger)",color:"#fff",fontSize:8,padding:"0 4px",borderRadius:8,marginLeft:3,fontFamily:"'Share Tech Mono',monospace",verticalAlign:"middle"}}>{unread}</span>}</span>
         </button>);
       })}</div>
       <div className="content" style={tab==="Mission"&&mission?{padding:6,display:"flex",flexDirection:"column"}:{}}>
         {tab==="Squad"&&<SquadTab game={game} selectedOp={selectedOp} setSelectedOp={setSelectedOp} setGearModal={setGearModal} unequipGear={unequipGear} learnSkill={learnSkill} dismissOp={dismissOp}/>}
-        {tab==="Mission"&&<MissionTab game={game} mission={mission} combatLog={combatLog} decision={decision} missionResult={missionResult} logRef={logRef} startMission={startMission} advanceMission={advanceMission} handleDecision={handleDecision} resetMission={resetMission} advanceDebrief={advanceDebrief}/>}
+        {tab==="Mission"&&<MissionTab game={game} mission={mission} combatLog={combatLog} decision={decision} missionResult={missionResult} logRef={logRef} animation={animation} advanceAnimation={advanceAnimation} skipAnimation={skipAnimation} startMission={startMission} advanceMission={advanceMission} handleDecision={handleDecision} resetMission={resetMission} advanceDebrief={advanceDebrief}/>}
         {tab==="Comms"&&<CommsTab game={game} updateGame={updateGame}/>}
         {tab==="Inventory"&&<InventoryTab game={game} invFilter={invFilter} setInvFilter={setInvFilter} stimTarget={stimTarget} setStimTarget={setStimTarget} buyStim={buyStim} useStim={useStim} scrapGear={scrapGear}/>}
         {tab==="Recruit"&&<RecruitTab game={game} recruitOp={recruitOp}/>}
       </div>
       <GearModal gearModal={gearModal} setGearModal={setGearModal} game={game} equipGear={equipGear}/>
       {showNewGameConfirm && <NewGameConfirm onConfirm={()=>{setShowNewGameConfirm(false);newGame();}} onCancel={()=>setShowNewGameConfirm(false)}/>}
+      {showSettings && <SettingsModal settings={game.settings} updateSettings={updateSettings} onClose={()=>setShowSettings(false)}/>}
     </div>
   );
 }

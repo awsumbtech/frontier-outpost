@@ -33,7 +33,28 @@
       "Bash(find '/c/Source/Projects/Frontier Outpost/src' -type f -name *intro* -o -name *tutorial* -o -name *welcome*)",
       "Bash(find /c/Source/Projects/Frontier Outpost/src -type f \\\\\\(-name *.js -o -name *.jsx \\\\\\))",
       "Skill(commit-commands:commit)",
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Bash(gh repo:*)",
+      "Bash(find '/c/Source/Projects/Frontier Outpost/src' -type f -name *.js -o -name *.jsx)",
+      "Bash(node -e \"const m = require\\(''./src/engine/combatAnimation.js''\\)\")",
+      "Bash(node -e \"import\\(''./src/engine/combatAnimation.js''\\).then\\(m => console.log\\(''exports:'', Object.keys\\(m\\)\\)\\).catch\\(e => console.log\\(''error:'', e.message\\)\\)\")",
+      "Bash(node --input-type=module -e \":*)",
+      "Bash(node -e \"console.log\\(require\\(''./node_modules/react/package.json''\\).version\\)\")",
+      "Bash(timeout 5 npx vite --host)",
+      "Bash(curl -s http://localhost:5173)",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "Read(//c/Source/Projects/Frontier Outpost/$APPDATA/claude/**)",
+      "Read(//c/Source/Projects/Frontier Outpost/$USERPROFILE/.claude/**)",
+      "Read(//c/Source/Projects/Frontier Outpost/$LOCALAPPDATA/**)",
+      "Bash(VERCEL_PLUGIN_HOOK_DEBUG=1 echo '{\"\"\"\"tool_name\"\"\"\":\"\"\"\"Read\"\"\"\",\"\"\"\"tool_input\"\"\"\":{\"\"\"\"file_path\"\"\"\":\"\"\"\"/c/Source/Projects/Frontier Outpost/src/App.jsx\"\"\"\"},\"\"\"\"session_id\"\"\"\":\"\"\"\"test123\"\"\"\"}')",
+      "Bash(node \"$USERPROFILE/.claude/plugins/cache/claude-plugins-official/vercel/2e79fc9698b0/hooks/pretooluse-skill-inject.mjs\")",
+      "mcp__plugin_figma_figma__whoami",
+      "mcp__plugin_figma_figma__create_new_file",
+      "mcp__plugin_figma_figma__use_figma",
+      "mcp__plugin_figma_figma__get_screenshot",
+      "Bash(netstat -ano)"
     ]
   }
 }

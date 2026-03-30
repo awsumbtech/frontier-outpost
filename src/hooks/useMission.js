@@ -6,15 +6,62 @@ import { rng, pick } from "../engine/utils";
 import { generateGear } from "../engine/gear";
 import { getEffectiveStats, xpForLevel } from "../engine/operatives";
 import { generateEncounter, combatRound } from "../engine/combat";
+import { combatRoundWithSnapshots } from "../engine/combatAnimation";
 
 export default function useMission(game, setGame, updateGame, setTab) {
   const [mission, setMission] = useState(null);
   const [combatLog, setCombatLog] = useState([]);
   const [decision, setDecision] = useState(null);
   const [missionResult, setMissionResult] = useState(null);
+  const [animation, setAnimation] = useState(null);
   const logRef = useRef(null);
 
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [combatLog]);
+
+  // Step-through animation — uses a mutable ref for the queue to avoid React timing issues.
+  // A single setInterval reads/writes the ref directly, calling React setters only for display.
+  const animDataRef = useRef(null);  // { queue, index, postCombatLog, applyPostCombat }
+
+  function startAnimationPlayback(data) {
+    animDataRef.current = { ...data, index: 0 };
+    // Show first action immediately
+    const firstSnap = data.queue[0];
+    animDataRef.current.index = 1;
+    setCombatLog(p => [...p, ...firstSnap.logEntries]);
+    setAnimation({ queue: data.queue, index: 1, displayAllies: firstSnap.allies, displayEnemies: firstSnap.enemies, highlightId: firstSnap.actorId });
+  }
+
+  function advanceAnimation() {
+    const d = animDataRef.current;
+    if (!d) return;
+
+    // If we already showed the last action, this click finishes the round
+    if (d.index >= d.queue.length) {
+      if (d.postCombatLog.length > 0) setCombatLog(p => [...p, ...d.postCombatLog]);
+      if (d.applyPostCombat) d.applyPostCombat();
+      animDataRef.current = null;
+      setAnimation(null);
+      return;
+    }
+
+    const snap = d.queue[d.index];
+    d.index++;
+
+    setCombatLog(p => [...p, ...snap.logEntries]);
+    // Show this action's result — highlight the actor, update HP display
+    setAnimation({ queue: d.queue, index: d.index, displayAllies: snap.allies, displayEnemies: snap.enemies, highlightId: snap.actorId });
+  }
+
+  function skipAnimation() {
+    const d = animDataRef.current;
+    if (!d) return;
+    const remaining = d.queue.slice(d.index);
+    const logs = remaining.flatMap(s => s.logEntries);
+    setCombatLog(p => [...p, ...logs, ...d.postCombatLog]);
+    if (d.applyPostCombat) d.applyPostCombat();
+    animDataRef.current = null;
+    setAnimation(null);
+  }
 
   function betweenEncounterHeal() {
     setGame(prev => ({
@@ -38,7 +85,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
     setMission({ type: mt, currentEncounter: 0, totalEncounters: mt.encounters, phase: "briefing", enemies: [], roundNum: 0, decisionApplied: {}, combatStats: { totalRounds: 0, enemiesKilled: 0, operativesDowned: 0 }, debriefPhase: null, prevMissionsCompleted: game.missionsCompleted });
     const currentChapter = STORY_CHAPTERS.filter(ch => game.missionsCompleted >= ch.unlockAt).pop();
     const storyFlavor = currentChapter ? [{ text: `[${currentChapter.title}]`, type: "decision" }] : [];
-    setCombatLog([{ text: `MISSION: ${mt.name.toUpperCase()}`, type: "header" }, { text: mt.desc, type: "info" }, ...storyFlavor]);
+    setCombatLog([...storyFlavor]);
     setDecision(null); setMissionResult(null); setTab("Mission");
   }
 
@@ -50,27 +97,51 @@ export default function useMission(game, setGame, updateGame, setTab) {
       setMission(m => ({ ...m, phase: "combat", enemies, currentEncounter: 1, roundNum: 0 })); return;
     }
     if (mission.phase === "combat") {
+      const stepThrough = game.settings?.stepThroughCombat || false;
       const log = []; const rn = mission.roundNum + 1;
       log.push({ text: `Round ${rn}`, type: "round" });
       const squad = [...game.squad.filter(o => o.alive)]; const enemies = [...mission.enemies];
       const aliveEnemiesBefore = enemies.filter(e => e.alive).length;
       const aliveSquadBefore = squad.filter(o => o.alive).length;
+
+      // Capture pre-combat state BEFORE any mutations (for step-through initial display)
+      const preCombatEnemyState = enemies.map(e => ({ id: e.id, hp: e.hp, alive: e.alive, stunned: e.stunned, bleed: e.bleed }));
+
+      // Pre-combat effects
       if (rn === 1) for (const op of squad) { const s = getEffectiveStats(op); if (s.minesDmg) { for (const e of enemies.filter(e => e.alive)) { e.hp -= s.minesDmg; if (e.hp <= 0) e.alive = false; } log.push({ text: `💣 Mines ${s.minesDmg} AoE!`, type: "aoe" }); }}
       if (rn % 4 === 0) for (const op of squad) { const s = getEffectiveStats(op); if (s.orbitalDmg) { for (const e of enemies.filter(e => e.alive)) { const d = Math.max(1, s.orbitalDmg - Math.floor(e.armor*.2)); e.hp -= d; if (e.hp <= 0) e.alive = false; } log.push({ text: `🛰 ORBITAL ${s.orbitalDmg} AoE!`, type: "aoe" }); }}
       if (mission.decisionApplied.counterAmbush && rn === 1) log.push({ text: `Counter-ambush! +30% dmg`, type: "decision" });
       if (mission.decisionApplied.overload && rn === 1) { for (const e of enemies.filter(e => e.alive)) { e.hp -= 25; if (e.hp <= 0) e.alive = false; } log.push({ text: `Overload 25 AoE!`, type: "aoe" }); }
-      combatRound(squad, enemies, log);
+
+      // Run combat — snapshot version or original
+      let combatSnapshots = null;
+      if (stepThrough) {
+        const result = combatRoundWithSnapshots(squad, enemies);
+        combatSnapshots = result.snapshots;
+        log.push(...result.finalLog);
+      } else {
+        combatRound(squad, enemies, log);
+      }
+
       const killsThisRound = aliveEnemiesBefore - enemies.filter(e => e.alive).length;
       const downsThisRound = aliveSquadBefore - squad.filter(o => o.alive).length;
+
+      // Always apply final state to game immediately (saves are correct)
       setGame(prev => ({ ...prev, squad: prev.squad.map(o => { const m = squad.find(s => s.id === o.id); return m ? { ...o, currentHp: m.currentHp, currentShield: m.currentShield, alive: m.alive } : o; }) }));
-      setCombatLog(p => [...p, ...log]);
+
       const updatedStats = { totalRounds: mission.combatStats.totalRounds + 1, enemiesKilled: mission.combatStats.enemiesKilled + killsThisRound, operativesDowned: mission.combatStats.operativesDowned + downsThisRound };
+
+      // Collect post-combat log entries
+      const postLog = [];
+      let postMissionState = null;
+      let postMissionResult = null;
+      let postEncounterData = null;
+
       if (squad.every(o => !o.alive)) {
-        setCombatLog(p => [...p, { text: "MISSION FAILED", type: "header" }]);
-        setMission(m => ({ ...m, phase: "result", debriefPhase: "stats", combatStats: updatedStats }));
-        setMissionResult({ success: false, combatStats: updatedStats, newBeats: [] }); return;
-      }
-      if (enemies.every(e => !e.alive)) {
+        postLog.push({ text: "MISSION FAILED", type: "header" });
+        postMissionState = { phase: "result", debriefPhase: "stats", combatStats: updatedStats };
+        postMissionResult = { success: false, combatStats: updatedStats, newBeats: [] };
+      } else if (enemies.every(e => !e.alive)) {
         const ne = mission.currentEncounter + 1;
         if (ne > mission.totalEncounters) {
           const tm = mission.type.tier; const loot = Array.from({ length: rng(1, 2 + tm) }, () => generateGear(pick(["weapon","armor","implant","gadget"]), pick(CLASS_KEYS), game.squad[0]?.level || 1));
@@ -80,21 +151,79 @@ export default function useMission(game, setGame, updateGame, setTab) {
           const prevMC = mission.prevMissionsCompleted;
           const newMC = prevMC + (isFirstClear ? 1 : 0);
           const newBeats = STORY_CHAPTERS.flatMap(ch => ch.beats.filter(b => b.at > prevMC && b.at <= newMC).map(b => ({ ...b, chapterId: ch.id })));
-          setCombatLog(p => [...p, { text: "MISSION COMPLETE", type: "header" }, { text: `+${xp}XP +${creds}¢ ${loot.length} items${!isFirstClear ? " (repeat)" : " ★FIRST CLEAR"}`, type: "info" }]);
-          setMission(m => ({ ...m, phase: "result", debriefPhase: "stats", combatStats: updatedStats }));
-          setMissionResult({ success: true, loot, xp, credits: creds, combatStats: updatedStats, newBeats });
+          postLog.push({ text: "MISSION COMPLETE", type: "header" }, { text: `+${xp}XP +${creds}¢ ${loot.length} items${!isFirstClear ? " (repeat)" : " ★FIRST CLEAR"}`, type: "info" });
+          postMissionState = { phase: "result", debriefPhase: "stats", combatStats: updatedStats };
+          postMissionResult = { success: true, loot, xp, credits: creds, combatStats: updatedStats, newBeats };
           updateGame(g => { const wasFirstClear = !g.completedMissions?.[mission.type.id]; const ng = { ...g, inventory: [...g.inventory, ...loot], credits: g.credits + creds, missionsCompleted: g.missionsCompleted + (wasFirstClear ? 1 : 0), completedMissions: { ...(g.completedMissions || {}), [mission.type.id]: (g.completedMissions?.[mission.type.id] || 0) + 1 } };
             ng.squad = ng.squad.map(o => { if (!o.alive) return o; let nx = o.xp + xp, lv = o.level, sp = o.skillPoints, xn = xpForLevel(lv);
-              while (nx >= xn) { nx -= xn; lv++; sp++; xn = xpForLevel(lv); } return { ...o, xp: nx, level: lv, skillPoints: sp, xpToLevel: xn }; }); return ng; }); return;
+              while (nx >= xn) { nx -= xn; lv++; sp++; xn = xpForLevel(lv); } return { ...o, xp: nx, level: lv, skillPoints: sp, xpToLevel: xn }; }); return ng; });
+        } else {
+          if (Math.random() > 0.4) {
+            const evt = pick(DECISION_EVENTS);
+            postLog.push({ text: `⟐ ${evt.title}`, type: "decision" });
+            postEncounterData = { type: "decision", evt, updatedStats };
+          } else {
+            const newE = generateEncounter(mission.type.tier, ne - 1);
+            postLog.push({ text: `💚 Squad recovers between encounters`, type: "heal" }, { text: `Encounter ${ne}/${mission.totalEncounters}`, type: "round" }, { text: newE.map(e => e.name).join(", "), type: "info" });
+            postEncounterData = { type: "nextEncounter", newE, ne, updatedStats };
+          }
         }
-        if (Math.random() > 0.4) { const evt = pick(DECISION_EVENTS); setDecision(evt); setMission(m => ({ ...m, phase: "decision", roundNum: 0, combatStats: updatedStats })); setCombatLog(p => [...p, { text: `⟐ ${evt.title}`, type: "decision" }]); betweenEncounterHeal(); return; }
-        const newE = generateEncounter(mission.type.tier, ne - 1);
-        betweenEncounterHeal();
-        setCombatLog(p => [...p, { text: `💚 Squad recovers between encounters`, type: "heal" }, { text: `Encounter ${ne}/${mission.totalEncounters}`, type: "round" }, { text: newE.map(e => e.name).join(", "), type: "info" }]);
-        setMission(m => ({ ...m, enemies: newE, currentEncounter: ne, roundNum: 0, decisionApplied: {}, combatStats: updatedStats })); return;
+      } else if (rn % 3 === 0 && !decision) {
+        const evt = pick(DECISION_EVENTS);
+        postLog.push({ text: `⟐ ${evt.title}`, type: "decision" });
+        postEncounterData = { type: "midRoundDecision", evt, rn, updatedStats };
       }
-      if (rn % 3 === 0 && !decision) { const evt = pick(DECISION_EVENTS); setDecision(evt); setMission(m => ({ ...m, phase: "decision", roundNum: rn, combatStats: updatedStats })); setCombatLog(p => [...p, { text: `⟐ ${evt.title}`, type: "decision" }]); return; }
-      setMission(m => ({ ...m, enemies, roundNum: rn, combatStats: updatedStats }));
+
+      // Apply post-combat effects helper
+      function applyPostCombat() {
+        if (postMissionState) {
+          setMission(m => ({ ...m, ...postMissionState }));
+          setMissionResult(postMissionResult);
+        } else if (postEncounterData) {
+          if (postEncounterData.type === "decision") {
+            setDecision(postEncounterData.evt);
+            setMission(m => ({ ...m, phase: "decision", roundNum: 0, combatStats: postEncounterData.updatedStats }));
+            betweenEncounterHeal();
+          } else if (postEncounterData.type === "nextEncounter") {
+            betweenEncounterHeal();
+            setMission(m => ({ ...m, enemies: postEncounterData.newE, currentEncounter: postEncounterData.ne, roundNum: 0, decisionApplied: {}, combatStats: postEncounterData.updatedStats }));
+          } else if (postEncounterData.type === "midRoundDecision") {
+            setDecision(postEncounterData.evt);
+            setMission(m => ({ ...m, phase: "decision", roundNum: postEncounterData.rn, combatStats: postEncounterData.updatedStats }));
+          }
+        } else {
+          setMission(m => ({ ...m, enemies, roundNum: rn, combatStats: updatedStats }));
+        }
+      }
+
+      if (stepThrough && combatSnapshots && combatSnapshots.length > 0) {
+        // Step-through: show round header + pre-combat immediately, animate the rest
+        const preCombatLog = log.slice(0, log.length - combatSnapshots.flatMap(s => s.logEntries).length);
+        setCombatLog(p => [...p, ...preCombatLog]);
+
+        // Initial display state = pre-combat HP values
+        const initAllies = squad.map(o => ({ id: o.id, currentHp: game.squad.find(s => s.id === o.id)?.currentHp || o.currentHp, currentShield: game.squad.find(s => s.id === o.id)?.currentShield || o.currentShield, alive: game.squad.find(s => s.id === o.id)?.alive ?? true }));
+        const initEnemies = preCombatEnemyState;
+
+        // Start animation playback — uses mutable ref + setInterval for reliable timing
+        startAnimationPlayback({
+          queue: combatSnapshots,
+          displayAllies: initAllies,
+          displayEnemies: initEnemies,
+          postCombatLog: postLog,
+          applyPostCombat,
+        });
+
+        // Don't apply post-combat yet — animation completion handles it
+        // But update mission enemies/round so state stays consistent
+        if (!postMissionState && !postEncounterData) {
+          setMission(m => ({ ...m, enemies, roundNum: rn, combatStats: updatedStats }));
+        }
+      } else {
+        // Instant mode: dump everything at once (original behavior)
+        setCombatLog(p => [...p, ...log, ...postLog]);
+        applyPostCombat();
+      }
     }
   }
 
@@ -111,7 +240,8 @@ export default function useMission(game, setGame, updateGame, setTab) {
   }
 
   function resetMission() {
-    setMission(null); setDecision(null); setMissionResult(null); setCombatLog([]);
+    animDataRef.current = null;
+    setMission(null); setDecision(null); setMissionResult(null); setCombatLog([]); setAnimation(null);
     updateGame(g => ({ ...g, squad: g.squad.map(o => { const s = getEffectiveStats(o); return { ...o, alive: true, currentHp: s.hp, currentShield: s.shield }; }) })); setTab("Squad");
   }
 
@@ -144,6 +274,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
 
   return {
     mission, combatLog, decision, missionResult, logRef,
+    animation, advanceAnimation, skipAnimation,
     startMission, advanceMission, handleDecision, resetMission, advanceDebrief,
   };
 }
