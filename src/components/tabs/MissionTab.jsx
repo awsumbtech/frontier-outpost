@@ -1,5 +1,6 @@
 import { MISSIONS } from '../../data/missions';
 import { STORY_CHAPTERS } from '../../data/story';
+import { ENEMY_TEMPLATES } from '../../data/enemies';
 import { RARITY_NAMES, RARITY_COLORS } from '../../data/constants';
 import BattleScene from '../combat/BattleScene';
 
@@ -85,6 +86,7 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
       combatLog={combatLog}
       logRef={logRef}
       missionTypeName={mission.type.name}
+      environment={mission.environment}
     />
     <div className="sticky-bar">
       {decision&&mission.phase==="decision"&&(
@@ -144,6 +146,30 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
       })()}
 
       <div style={{display:"flex",gap:5}}>
+        {mission.phase==="briefing"&&mission.environment&&(
+          <div className="env-briefing">
+            <div className="env-briefing-header">
+              <span className="env-briefing-location">Location</span>
+            </div>
+            <div className="env-briefing-name">{mission.environment.name}</div>
+            <div className="env-briefing-desc">{mission.environment.description}</div>
+            {(() => {
+              const tierEnemies = ENEMY_TEMPLATES.filter(e => e.tier === mission.type.tier && e.lore);
+              if (tierEnemies.length === 0) return null;
+              return (
+                <div className="threat-intel">
+                  <div className="threat-intel-title">Threat Intel</div>
+                  {tierEnemies.map(e => (
+                    <div className="threat-intel-entry" key={e.name}>
+                      <div className="threat-intel-name">{e.name}</div>
+                      <div className="threat-intel-lore">{e.lore}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
         {mission.phase==="briefing"&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceMission}>Begin Mission</button>}
         {mission.phase==="combat"&&!decision&&!animation&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceMission}>Next Round ▸</button>}
         {animation&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceAnimation}>Next ▸</button>}

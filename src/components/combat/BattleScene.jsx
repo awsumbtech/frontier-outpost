@@ -5,7 +5,7 @@ import MissionProgressDots from './MissionProgressDots';
 import ActionBanner from './ActionBanner';
 import CompactLog from './CompactLog';
 
-export default function BattleScene({ squad, enemies, animation, currentEncounter, totalEncounters, roundNum, combatLog, logRef, missionTypeName }) {
+export default function BattleScene({ squad, enemies, animation, currentEncounter, totalEncounters, roundNum, combatLog, logRef, missionTypeName, environment }) {
   // Merge animation display states over real state
   const displaySquad = animation?.displayAllies
     ? squad.map(op => {
@@ -22,7 +22,13 @@ export default function BattleScene({ squad, enemies, animation, currentEncounte
     : enemies;
 
   return (
-    <div className="battlefield">
+    <div className={`battlefield ${environment?.cssClass || ''}`}>
+      {environment && (
+        <>
+          <div className="env-background" style={{ backgroundImage: `url(${environment.backgroundImage})` }} />
+          <div className={`env-atmosphere ${environment.atmosphere.map(a => `atmo-${a}`).join(' ')}`} />
+        </>
+      )}
       <TurnOrderBar squad={displaySquad} enemies={displayEnemies} highlightId={animation?.highlightId} />
       <MissionProgressDots current={currentEncounter} total={totalEncounters} roundNum={roundNum} missionName={missionTypeName} />
       <div className="battle-field-area">

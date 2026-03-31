@@ -7,6 +7,7 @@ import { generateGear } from "../engine/gear";
 import { getEffectiveStats, xpForLevel } from "../engine/operatives";
 import { generateEncounter, combatRound } from "../engine/combat";
 import { combatRoundWithSnapshots } from "../engine/combatAnimation";
+import { getEnvironmentForMission } from "../engine/environments";
 
 export default function useMission(game, setGame, updateGame, setTab) {
   const [mission, setMission] = useState(null);
@@ -82,7 +83,8 @@ export default function useMission(game, setGame, updateGame, setTab) {
   function startMission(mt) {
     if (game.squad.filter(o => o.alive).length === 0) return;
     updateGame(g => ({ ...g, squad: g.squad.map(o => { const s = getEffectiveStats(o); return { ...o, alive: true, currentHp: s.hp, currentShield: s.shield }; }) }));
-    setMission({ type: mt, currentEncounter: 0, totalEncounters: mt.encounters, phase: "briefing", enemies: [], roundNum: 0, decisionApplied: {}, combatStats: { totalRounds: 0, enemiesKilled: 0, operativesDowned: 0 }, debriefPhase: null, prevMissionsCompleted: game.missionsCompleted });
+    const environment = getEnvironmentForMission(mt.id);
+    setMission({ type: mt, currentEncounter: 0, totalEncounters: mt.encounters, phase: "briefing", enemies: [], roundNum: 0, decisionApplied: {}, combatStats: { totalRounds: 0, enemiesKilled: 0, operativesDowned: 0 }, debriefPhase: null, prevMissionsCompleted: game.missionsCompleted, environment });
     const currentChapter = STORY_CHAPTERS.filter(ch => game.missionsCompleted >= ch.unlockAt).pop();
     const storyFlavor = currentChapter ? [{ text: `[${currentChapter.title}]`, type: "decision" }] : [];
     setCombatLog([...storyFlavor]);
