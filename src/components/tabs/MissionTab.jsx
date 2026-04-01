@@ -4,7 +4,7 @@ import { ENEMY_TEMPLATES } from '../../data/enemies';
 import { RARITY_NAMES, RARITY_COLORS } from '../../data/constants';
 import BattleScene from '../combat/BattleScene';
 
-export default function MissionTab({ game, mission, combatLog, decision, missionResult, logRef, animation, advanceAnimation, skipAnimation, startMission, advanceMission, handleDecision, resetMission, advanceDebrief }) {
+export default function MissionTab({ game, mission, combatLog, decision, missionResult, logRef, animation, advanceAnimation, skipAnimation, banter, storyReactions, startMission, advanceMission, handleDecision, resetMission, advanceDebrief }) {
   if (!mission) {
     const avg = game.squad.length>0?Math.round(game.squad.reduce((s,o)=>s+o.level,0)/game.squad.length):1;
     const completed = game.completedMissions || {};
@@ -42,19 +42,22 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
             <span style={{fontSize:"var(--font-xxs)",fontFamily:"'Share Tech Mono',monospace",color:"var(--text2)"}}>{doneCount}/{chMissions.length}</span>
           </div>
 
-          {isUnlocked && chMissions.map(mt => {
+          {isUnlocked && chMissions.map((mt, mi) => {
             const isDone = !!completed[mt.id];
             const timesCleared = completed[mt.id] || 0;
+            const prevDone = mi === 0 || !!completed[chMissions[mi - 1].id];
+            const isAvailable = isDone || prevDone;
             const levelDiff = avg - mt.recLevel;
             const diffColor = levelDiff >= 2 ? "var(--success)" : levelDiff >= 0 ? "var(--accent)" : levelDiff >= -2 ? "var(--warning)" : "var(--danger)";
             const diffLabel = levelDiff >= 2 ? "Easy" : levelDiff >= 0 ? "Fair" : levelDiff >= -2 ? "Hard" : "Brutal";
 
-            return (<div className="mission-card" key={mt.id} onClick={()=>startMission(mt)}
-              style={{borderLeftWidth:3,borderLeftStyle:"solid",borderLeftColor:isDone?"var(--success)":"var(--border2)",marginLeft:8}}>
+            return (<div className={`mission-card${!isAvailable?" mission-locked":""}`} key={mt.id} onClick={()=>isAvailable&&startMission(mt)}
+              style={{borderLeftWidth:3,borderLeftStyle:"solid",borderLeftColor:isDone?"var(--success)":isAvailable?"var(--border2)":"var(--border)",marginLeft:8,opacity:isAvailable?1:0.4,cursor:isAvailable?"pointer":"default"}}>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 {isDone && <span style={{color:"var(--success)",fontSize:13,fontWeight:700}}>✓</span>}
+                {!isDone && !isAvailable && <span style={{color:"var(--text2)",fontSize:12}}>🔒</span>}
                 <h4 style={{flex:1,fontSize:"var(--font-sm)"}}>{mt.name}</h4>
-                <span style={{fontSize:"var(--font-xxs)",fontFamily:"'Share Tech Mono',monospace",color:diffColor,background:diffColor+"15",padding:"2px 6px",borderRadius:3}}>{diffLabel}</span>
+                {isAvailable && <span style={{fontSize:"var(--font-xxs)",fontFamily:"'Share Tech Mono',monospace",color:diffColor,background:diffColor+"15",padding:"2px 6px",borderRadius:3}}>{diffLabel}</span>}
               </div>
               <div className="mission-desc">{mt.desc}</div>
               <div className="mission-meta">
@@ -93,6 +96,14 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
         <div className="decision-panel">
           <h3>⟐ {decision.title}</h3><p>{decision.desc}</p>
           {decision.choices.map((c,i)=>(<button className="choice-btn" key={i} onClick={()=>handleDecision(c)}>{c.text}<div className="choice-desc">{c.desc}</div></button>))}
+        </div>
+      )}
+
+      {banter&&mission.phase==="combat"&&!decision&&(
+        <div className="banter-panel">
+          {banter.lines.map((line, i) => (
+            <div key={i} className="banter-line"><span className="banter-speaker">{line.speaker}:</span> {line.text}</div>
+          ))}
         </div>
       )}
 
@@ -140,6 +151,13 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
             <div className="transmission-header">INCOMING TRANSMISSION</div>
             <div className="transmission-sender">{beat.sender}</div>
             <div className="transmission-text">{beat.text}</div>
+            {storyReactions&&storyReactions.length>0&&(
+              <div className="story-reactions">
+                {storyReactions.map((r, i) => (
+                  <div key={i} className="story-reaction"><span className="reaction-speaker">{r.opName}:</span> "{r.text}"</div>
+                ))}
+              </div>
+            )}
             {beats.length>1&&<div className="transmission-progress">{idx+1} of {beats.length}</div>}
           </div>
         );

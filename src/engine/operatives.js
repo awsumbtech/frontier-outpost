@@ -1,7 +1,7 @@
 import { CLASSES } from '../data/classes';
 import { uid } from './utils';
 
-export function createOperative(classKey, name) {
+export function createOperative(classKey, name, traits = []) {
   const cls = CLASSES[classKey];
   return {
     id: uid(), name, classKey, className: cls.name, icon: cls.icon, color: cls.color,
@@ -9,6 +9,7 @@ export function createOperative(classKey, name) {
     baseStats: { ...cls.baseStats },
     gear: { weapon: null, armor: null, implant: null, gadget: null },
     skills: {}, alive: true, currentHp: cls.baseStats.hp, currentShield: cls.baseStats.shield,
+    traits,
   };
 }
 

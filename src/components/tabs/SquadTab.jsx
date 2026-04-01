@@ -14,6 +14,7 @@ export default function SquadTab({ game, selectedOp, setSelectedOp, setGearModal
       <div className="card">
         <div className="card-header"><span className="icon">{op.icon}</span><h3 style={{color:op.color}}>{op.name}</h3><span className="level">LVL {op.level}</span></div>
         <div style={{fontSize:"var(--font-xs)",color:"var(--text2)",marginBottom:4}}>{cls.desc}</div>
+        {(op.traits||[]).length>0&&<div className="trait-badges">{op.traits.map(t=><span className="trait-badge" key={t}>{t}</span>)}</div>}
         <div className="xp-bar-container"><div className="xp-bar" style={{width:`${(op.xp/op.xpToLevel)*100}%`}}/></div>
         <div style={{fontSize:"var(--font-xxs)",color:"var(--text2)"}}>XP: {op.xp}/{op.xpToLevel} · SP: <span style={{color:op.skillPoints>0?"var(--warning)":"var(--text2)"}}>{op.skillPoints}</span></div>
         <div className="stat-grid">
@@ -66,7 +67,7 @@ export default function SquadTab({ game, selectedOp, setSelectedOp, setGearModal
   return (<div>{game.squad.map(op=>{
     const s=getEffectiveStats(op); const hp=(op.currentHp/s.hp)*100;
     return (<div className="card" key={op.id} onClick={()=>setSelectedOp(op.id)} style={{cursor:"pointer"}}>
-      <div className="card-header"><span className="icon">{op.icon}</span><h3 style={{color:op.color}}>{op.name}</h3><span style={{fontSize:"var(--font-xs)",color:"var(--text2)"}}>{op.className}</span><span className="level">L{op.level}</span></div>
+      <div className="card-header"><span className="icon">{op.icon}</span><h3 style={{color:op.color}}>{op.name}</h3><span style={{fontSize:"var(--font-xs)",color:"var(--text2)"}}>{op.className}</span>{(op.traits||[]).length>0&&<span className="trait-tags">{op.traits.map(t=><span key={t} className="trait-tag">{t}</span>)}</span>}<span className="level">L{op.level}</span></div>
       <div className="bar-container"><div className="bar-fill" style={{width:`${hp}%`,background:hp>50?"var(--success)":hp>25?"var(--warning)":"var(--danger)"}}/></div>
       <div className="squad-stats">
         <span className="stat-item"><span className="stat-label">HP</span> <span className="stat-val">{op.currentHp}/{s.hp}</span></span>

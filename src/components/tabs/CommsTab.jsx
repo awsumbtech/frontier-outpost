@@ -81,5 +81,18 @@ export default function CommsTab({ game, updateGame }) {
         return "Story complete";
       })()}
     </div>)}
+
+    {(game.memorial||[]).length>0&&(
+      <div className="memorial-section">
+        <div className="memorial-header">IN MEMORIAM</div>
+        {game.memorial.map((m, i) => (
+          <div key={i} className="memorial-entry">
+            <span className="memorial-icon">{m.icon||'◆'}</span>
+            <span className="memorial-name">{m.name}</span>
+            {(m.traits||[]).length>0&&<span className="memorial-traits">{m.traits.join(' · ')}</span>}
+          </div>
+        ))}
+      </div>
+    )}
   </div>);
 }

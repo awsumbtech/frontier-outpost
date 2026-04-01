@@ -8,6 +8,7 @@ import { getEffectiveStats, xpForLevel } from "../engine/operatives";
 import { generateEncounter, combatRound } from "../engine/combat";
 import { combatRoundWithSnapshots } from "../engine/combatAnimation";
 import { getEnvironmentForMission } from "../engine/environments";
+import { selectBark, selectBanter, getInlineStory, getDecisionEcho, getEnvFlavor, selectStoryReaction, selectDeathReaction } from "../engine/personality";
 
 export default function useMission(game, setGame, updateGame, setTab) {
   const [mission, setMission] = useState(null);
@@ -15,7 +16,11 @@ export default function useMission(game, setGame, updateGame, setTab) {
   const [decision, setDecision] = useState(null);
   const [missionResult, setMissionResult] = useState(null);
   const [animation, setAnimation] = useState(null);
+  const [banter, setBanter] = useState(null);
+  const [storyReactions, setStoryReactions] = useState([]);
   const logRef = useRef(null);
+  const recentBarksRef = useRef([]);
+  const barkBudgetRef = useRef(2);
 
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [combatLog]);
 
@@ -87,7 +92,9 @@ export default function useMission(game, setGame, updateGame, setTab) {
     setMission({ type: mt, currentEncounter: 0, totalEncounters: mt.encounters, phase: "briefing", enemies: [], roundNum: 0, decisionApplied: {}, combatStats: { totalRounds: 0, enemiesKilled: 0, operativesDowned: 0 }, debriefPhase: null, prevMissionsCompleted: game.missionsCompleted, environment });
     const currentChapter = STORY_CHAPTERS.filter(ch => game.missionsCompleted >= ch.unlockAt).pop();
     const storyFlavor = currentChapter ? [{ text: `[${currentChapter.title}]`, type: "decision" }] : [];
-    setCombatLog([...storyFlavor]);
+    const inlineStoryEntries = getInlineStory(mt.id, 'preEncounter', 0).map(s => ({ text: `${s.sender}: ${s.text}`, type: "story" }));
+    const echoEntries = getDecisionEcho(mt.id, game.decisionHistory || {}).map(s => ({ text: `${s.sender ? s.sender + ': ' : ''}${s.text}`, type: "story" }));
+    setCombatLog([...storyFlavor, ...inlineStoryEntries, ...echoEntries]);
     setDecision(null); setMissionResult(null); setTab("Mission");
   }
 
@@ -95,10 +102,14 @@ export default function useMission(game, setGame, updateGame, setTab) {
     if (!mission) return;
     if (mission.phase === "briefing") {
       const enemies = generateEncounter(mission.type.tier, 0);
-      setCombatLog(p => [...p, { text: `Encounter 1/${mission.totalEncounters}`, type: "round" }, { text: enemies.map(e => e.name).join(", "), type: "info" }]);
+      barkBudgetRef.current = 2; recentBarksRef.current = [];
+      const envFlavor = getEnvFlavor(mission.environment?.id);
+      const flavorEntry = envFlavor ? [{ text: envFlavor, type: "flavor" }] : [];
+      setCombatLog(p => [...p, ...flavorEntry, { text: `Encounter 1/${mission.totalEncounters}`, type: "round" }, { text: enemies.map(e => e.name).join(", "), type: "info" }]);
       setMission(m => ({ ...m, phase: "combat", enemies, currentEncounter: 1, roundNum: 0 })); return;
     }
     if (mission.phase === "combat") {
+      setBanter(null);
       const stepThrough = game.settings?.stepThroughCombat || false;
       const log = []; const rn = mission.roundNum + 1;
       log.push({ text: `Round ${rn}`, type: "round" });
@@ -141,6 +152,12 @@ export default function useMission(game, setGame, updateGame, setTab) {
 
       if (squad.every(o => !o.alive)) {
         postLog.push({ text: "MISSION FAILED", type: "header" });
+        const fallen = squad.filter(o => !o.alive);
+        const alive = squad.filter(o => o.alive);
+        for (const f of fallen) {
+          const reaction = selectDeathReaction(f, alive);
+          if (reaction) postLog.push({ text: `⟨${reaction.opName}⟩ ${reaction.text}`, type: "bark" });
+        }
         postMissionState = { phase: "result", debriefPhase: "stats", combatStats: updatedStats };
         postMissionResult = { success: false, combatStats: updatedStats, newBeats: [] };
       } else if (enemies.every(e => !e.alive)) {
@@ -166,6 +183,10 @@ export default function useMission(game, setGame, updateGame, setTab) {
             postEncounterData = { type: "decision", evt, updatedStats };
           } else {
             const newE = generateEncounter(mission.type.tier, ne - 1);
+            const betweenStory = getInlineStory(mission.type.id, 'betweenEncounter', mission.currentEncounter);
+            for (const s of betweenStory) postLog.push({ text: `${s.sender}: ${s.text}`, type: "story" });
+            const envFlavor2 = getEnvFlavor(mission.environment?.id);
+            if (envFlavor2) postLog.push({ text: envFlavor2, type: "flavor" });
             postLog.push({ text: `💚 Squad recovers between encounters`, type: "heal" }, { text: `Encounter ${ne}/${mission.totalEncounters}`, type: "round" }, { text: newE.map(e => e.name).join(", "), type: "info" });
             postEncounterData = { type: "nextEncounter", newE, ne, updatedStats };
           }
@@ -174,6 +195,36 @@ export default function useMission(game, setGame, updateGame, setTab) {
         const evt = pick(DECISION_EVENTS);
         postLog.push({ text: `⟐ ${evt.title}`, type: "decision" });
         postEncounterData = { type: "midRoundDecision", evt, rn, updatedStats };
+      }
+
+      // --- Combat bark injection ---
+      if (barkBudgetRef.current > 0) {
+        const barkEvents = [];
+        if (rn === 1) barkEvents.push('onEncounterStart');
+        if (killsThisRound > 0) barkEvents.push('onKill');
+        if (downsThisRound > 0) barkEvents.push('onAllyDown');
+        if (log.some(e => e.text && e.text.includes('★CRIT'))) barkEvents.push('onCrit');
+        const heavyDmg = squad.some(o => {
+          const prev = game.squad.find(s => s.id === o.id);
+          if (!prev || !o.alive) return false;
+          const maxHp = getEffectiveStats(prev).hp || 1;
+          return (prev.currentHp - o.currentHp) > maxHp * 0.3;
+        });
+        if (heavyDmg) barkEvents.push('onHeavyDamage');
+
+        for (const evt of barkEvents) {
+          if (barkBudgetRef.current <= 0) break;
+          const aliveSquad = squad.filter(o => o.alive && (o.traits || []).length > 0);
+          if (aliveSquad.length === 0) break;
+          const barker = pick(aliveSquad);
+          const bark = selectBark(evt, barker, recentBarksRef.current);
+          if (bark) {
+            postLog.push({ text: `⟨${bark.opName}⟩ ${bark.text}`, type: "bark" });
+            recentBarksRef.current.push(bark.text);
+            barkBudgetRef.current--;
+            break;
+          }
+        }
       }
 
       // Apply post-combat effects helper
@@ -186,8 +237,13 @@ export default function useMission(game, setGame, updateGame, setTab) {
             setDecision(postEncounterData.evt);
             setMission(m => ({ ...m, phase: "decision", roundNum: 0, combatStats: postEncounterData.updatedStats }));
             betweenEncounterHeal();
+            const banterResult = selectBanter(game.squad.filter(o => o.alive));
+            setBanter(banterResult);
           } else if (postEncounterData.type === "nextEncounter") {
             betweenEncounterHeal();
+            barkBudgetRef.current = 2; recentBarksRef.current = [];
+            const banterResult = selectBanter(game.squad.filter(o => o.alive));
+            setBanter(banterResult);
             setMission(m => ({ ...m, enemies: postEncounterData.newE, currentEncounter: postEncounterData.ne, roundNum: 0, decisionApplied: {}, combatStats: postEncounterData.updatedStats }));
           } else if (postEncounterData.type === "midRoundDecision") {
             setDecision(postEncounterData.evt);
@@ -235,7 +291,10 @@ export default function useMission(game, setGame, updateGame, setTab) {
     if (choice.effect === "pushThrough") { setGame(p => ({ ...p, squad: p.squad.map(o => { if (!o.alive) return o; return { ...o, currentHp: Math.max(1, o.currentHp - Math.round(getEffectiveStats(o).hp * .15)) }; }) })); setMission(m => ({ ...m, currentEncounter: m.currentEncounter + 1 })); }
     if (choice.effect === "avoid") setMission(m => ({ ...m, currentEncounter: m.currentEncounter + 1 }));
     if (choice.effect === "salvage") { const b = generateGear(pick(["weapon","armor"]), pick(CLASS_KEYS), (game.squad[0]?.level||1)+1); b.rarity = Math.max(RARITY.RARE, b.rarity); updateGame(g => ({ ...g, inventory: [...g.inventory, b] })); }
-    setCombatLog(p => [...p, { text: `>> ${choice.text}`, type: "decision" }]); setDecision(null);
+    setCombatLog(p => [...p, { text: `>> ${choice.text}`, type: "decision" }]);
+    updateGame(g => ({ ...g, decisionHistory: { ...(g.decisionHistory || {}), [choice.effect]: mission.type.id } }));
+    setDecision(null);
+    barkBudgetRef.current = 2; recentBarksRef.current = [];
     const enemies = generateEncounter(mission.type.tier, mission.currentEncounter);
     setCombatLog(p => [...p, { text: `Encounter ${mission.currentEncounter}/${mission.totalEncounters}`, type: "round" }, { text: enemies.map(e => e.name).join(", "), type: "info" }]);
     setMission(m => ({ ...m, phase: "combat", enemies, roundNum: 0, decisionApplied: { ...m.decisionApplied, ...applied } }));
@@ -244,6 +303,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
   function resetMission() {
     animDataRef.current = null;
     setMission(null); setDecision(null); setMissionResult(null); setCombatLog([]); setAnimation(null);
+    setBanter(null); setStoryReactions([]);
     updateGame(g => ({ ...g, squad: g.squad.map(o => { const s = getEffectiveStats(o); return { ...o, alive: true, currentHp: s.hp, currentShield: s.shield }; }) })); setTab("Squad");
   }
 
@@ -252,6 +312,11 @@ export default function useMission(game, setGame, updateGame, setTab) {
     if (mission.debriefPhase === "stats") {
       const hasNewComms = missionResult?.newBeats?.length > 0;
       if (hasNewComms) {
+        const firstBeat = missionResult.newBeats[0];
+        if (firstBeat) {
+          const beatKey = `${firstBeat.chapterId}-${firstBeat.at}`;
+          setStoryReactions(selectStoryReaction(beatKey, game.squad));
+        }
         setMission(m => ({ ...m, debriefPhase: "comms", commsIndex: 0 }));
       } else {
         resetMission();
@@ -261,6 +326,11 @@ export default function useMission(game, setGame, updateGame, setTab) {
     if (mission.debriefPhase === "comms") {
       const beats = missionResult?.newBeats || [];
       if (mission.commsIndex < beats.length - 1) {
+        const nextBeat = beats[mission.commsIndex + 1];
+        if (nextBeat) {
+          const beatKey = `${nextBeat.chapterId}-${nextBeat.at}`;
+          setStoryReactions(selectStoryReaction(beatKey, game.squad));
+        }
         setMission(m => ({ ...m, commsIndex: m.commsIndex + 1 }));
       } else {
         updateGame(g => {
@@ -277,6 +347,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
   return {
     mission, combatLog, decision, missionResult, logRef,
     animation, advanceAnimation, skipAnimation,
+    banter, storyReactions,
     startMission, advanceMission, handleDecision, resetMission, advanceDebrief,
   };
 }

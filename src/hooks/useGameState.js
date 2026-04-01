@@ -4,17 +4,18 @@ import { OP_NAMES } from "../data/operativeNames";
 import { pick } from "../engine/utils";
 import { generateGear } from "../engine/gear";
 import { createOperative, getEffectiveStats } from "../engine/operatives";
+import { selectTraits, selectDeathReaction } from "../engine/personality";
 
 function initState() {
-  const s1 = createOperative("VANGUARD", OP_NAMES[0]);
-  const s2 = createOperative("RECON", OP_NAMES[1]);
+  const s1 = createOperative("VANGUARD", OP_NAMES[0], selectTraits());
+  const s2 = createOperative("RECON", OP_NAMES[1], selectTraits());
   s1.gear.weapon = generateGear("weapon", "VANGUARD", 1);
   s1.gear.armor = generateGear("armor", "VANGUARD", 1);
   s2.gear.weapon = generateGear("weapon", "RECON", 1);
   s2.gear.armor = generateGear("armor", "RECON", 1);
   const es1 = getEffectiveStats(s1); s1.currentHp = es1.hp; s1.currentShield = es1.shield;
   const es2 = getEffectiveStats(s2); s2.currentHp = es2.hp; s2.currentShield = es2.shield;
-  return { squad: [s1, s2], inventory: [generateGear("gadget", null, 1), generateGear("implant", null, 1), generateGear("weapon", "ENGINEER", 1)], credits: 200, missionsCompleted: 0, storyBeatsRead: {}, stims: [{ ...STIM_TYPES[0] }, { ...STIM_TYPES[0] }], completedMissions: {}, settings: { stepThroughCombat: true } };
+  return { squad: [s1, s2], inventory: [generateGear("gadget", null, 1), generateGear("implant", null, 1), generateGear("weapon", "ENGINEER", 1)], credits: 200, missionsCompleted: 0, storyBeatsRead: {}, stims: [{ ...STIM_TYPES[0] }, { ...STIM_TYPES[0] }], completedMissions: {}, decisionHistory: {}, memorial: [], settings: { stepThroughCombat: true } };
 }
 
 export default function useGameState() {
@@ -29,7 +30,7 @@ export default function useGameState() {
   const loadGame = useCallback(async () => {
     try {
       const r = await window.storage.get("frontier-v2");
-      if (r?.value) { const d = JSON.parse(r.value); if (d.squad) setGame(d); }
+      if (r?.value) { const d = JSON.parse(r.value); if (d.squad) { d.decisionHistory = d.decisionHistory || {}; d.memorial = d.memorial || []; d.squad = d.squad.map(o => ({ ...o, traits: o.traits || [] })); setGame(d); } }
       else { setShowIntro(true); }
     } catch(e){ setShowIntro(true); }
   }, []);
@@ -83,7 +84,7 @@ export default function useGameState() {
   function recruitOp(classKey) {
     if (game.squad.length >= 4 || game.credits < 150) return;
     const used = game.squad.map(o => o.name); const name = pick(OP_NAMES.filter(n => !used.includes(n)));
-    const op = createOperative(classKey, name); op.gear.weapon = generateGear("weapon", classKey, 1);
+    const op = createOperative(classKey, name, selectTraits()); op.gear.weapon = generateGear("weapon", classKey, 1);
     const es = getEffectiveStats(op); op.currentHp = es.hp; op.currentShield = es.shield;
     updateGame(g => ({ ...g, squad: [...g.squad, op], credits: g.credits - 150 }));
   }
@@ -91,7 +92,8 @@ export default function useGameState() {
   function dismissOp(opId) {
     updateGame(g => { const op = g.squad.find(o => o.id === opId); if (!op) return g;
       const inv = [...g.inventory]; for (const s of ["weapon","armor","implant","gadget"]) if (op.gear[s]) inv.push(op.gear[s]);
-      return { ...g, squad: g.squad.filter(o => o.id !== opId), inventory: inv }; }); setSelectedOp(null);
+      const memorial = [...(g.memorial || []), { name: op.name, classKey: op.classKey, icon: op.icon, traits: op.traits || [], reason: 'dismissed' }];
+      return { ...g, squad: g.squad.filter(o => o.id !== opId), inventory: inv, memorial }; }); setSelectedOp(null);
   }
 
   function buyStim(stimType) {
