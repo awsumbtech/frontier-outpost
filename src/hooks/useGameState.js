@@ -30,7 +30,16 @@ export default function useGameState() {
   const loadGame = useCallback(async () => {
     try {
       const r = await window.storage.get("frontier-v2");
-      if (r?.value) { const d = JSON.parse(r.value); if (d.squad) { d.decisionHistory = d.decisionHistory || {}; d.memorial = d.memorial || []; d.squad = d.squad.map(o => ({ ...o, traits: o.traits || [] })); setGame(d); } }
+      if (r?.value) {
+        const d = JSON.parse(r.value);
+        // Save version gate: wipe old saves missing ability system fields
+        if (!d._saveVersion || d._saveVersion < 2) {
+          await window.storage.set("frontier-v2", "");
+          setShowIntro(true);
+          return;
+        }
+        if (d.squad) { d.decisionHistory = d.decisionHistory || {}; d.memorial = d.memorial || []; d.squad = d.squad.map(o => ({ ...o, traits: o.traits || [], currentResource: o.currentResource ?? 0, activeEffects: o.activeEffects || [] })); setGame(d); }
+      }
       else { setShowIntro(true); }
     } catch(e){ setShowIntro(true); }
   }, []);
@@ -42,7 +51,7 @@ export default function useGameState() {
     setShowIntro(true);
   }, []);
 
-  const saveGame = useCallback(async (s) => { try { await window.storage.set("frontier-v2", JSON.stringify(s)); } catch(e){} }, []);
+  const saveGame = useCallback(async (s) => { try { await window.storage.set("frontier-v2", JSON.stringify({ ...s, _saveVersion: 2 })); } catch(e){} }, []);
   const updateGame = useCallback((fn) => { setGame(prev => { const next = fn(prev); saveGame(next); return next; }); }, [saveGame]);
 
   function equipGear(opId, slot, gearId) {

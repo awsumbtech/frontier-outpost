@@ -9,6 +9,7 @@ export default function MissionTab({
   banter, storyReactions,
   startMission, advanceMission, handleDecision, resetMission, advanceDebrief,
   selectAttack, selectDefend, selectItem, chooseStim, chooseTarget, cancelSelection,
+  selectAbility, chooseAbility, chooseAllyTarget,
 }) {
   if (!mission) {
     const avg = game.squad.length>0?Math.round(game.squad.reduce((s,o)=>s+o.level,0)/game.squad.length):1;
@@ -102,6 +103,9 @@ export default function MissionTab({
       chooseStim={chooseStim}
       chooseTarget={chooseTarget}
       cancelSelection={cancelSelection}
+      selectAbility={selectAbility}
+      chooseAbility={chooseAbility}
+      chooseAllyTarget={chooseAllyTarget}
     />
     <div className="sticky-bar">
       {decision&&mission.phase==="decision"&&(

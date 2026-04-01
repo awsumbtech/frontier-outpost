@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { RARITY, CLASS_KEYS } from "../data/constants";
+import { RARITY, CLASS_KEYS, CLASS_BASE_RESOURCE, CLASS_RESOURCE_NAMES } from "../data/constants";
+import { CLASSES } from "../data/classes";
 import { STORY_CHAPTERS } from "../data/story";
 import { DECISION_EVENTS } from "../data/decisions";
 import { rng, pick } from "../engine/utils";
@@ -17,6 +18,8 @@ import {
   executeEnemyTurn,
   applyRoundEndEffects,
   checkCombatEnd,
+  getAvailableAbilities,
+  executeAbility,
 } from "../engine/combat";
 import { getEnvironmentForMission } from "../engine/environments";
 import { selectBark, selectBanter, getInlineStory, getDecisionEcho, getEnvFlavor, selectStoryReaction, selectDeathReaction } from "../engine/personality";
@@ -48,10 +51,12 @@ export default function useMission(game, setGame, updateGame, setTab) {
         if (!o.alive) return o;
         const maxHp = getEffectiveStats(o).hp;
         const maxSh = getEffectiveStats(o).shield;
+        const maxResource = CLASS_BASE_RESOURCE[o.classKey] || 0;
         return {
           ...o,
           currentHp: Math.min(maxHp, o.currentHp + Math.round(maxHp * 0.15)),
           currentShield: Math.min(maxSh, o.currentShield + Math.round(maxSh * 0.25)),
+          currentResource: Math.min(maxResource, (o.currentResource || 0) + Math.round(maxResource * 0.25)),
         };
       })
     }));
@@ -64,7 +69,15 @@ export default function useMission(game, setGame, updateGame, setTab) {
       ...prev,
       squad: prev.squad.map(o => {
         const updated = newSquad.find(s => s.id === o.id);
-        return updated ? { ...o, currentHp: updated.currentHp, currentShield: updated.currentShield, alive: updated.alive, defending: updated.defending || false } : o;
+        return updated ? {
+          ...o,
+          currentHp: updated.currentHp,
+          currentShield: updated.currentShield,
+          alive: updated.alive,
+          defending: updated.defending || false,
+          currentResource: updated.currentResource ?? o.currentResource,
+          activeEffects: updated.activeEffects || [],
+        } : o;
       })
     }));
   }
@@ -205,6 +218,69 @@ export default function useMission(game, setGame, updateGame, setTab) {
     setTurnState(ts => ts ? { ...ts, subPhase: "selectItem", selectedAction: "item" } : ts);
   }
 
+  function selectAbility() {
+    setTurnState(ts => ts ? { ...ts, subPhase: "selectAbility", selectedAction: "ability" } : ts);
+  }
+
+  function chooseAbility(abilityId) {
+    if (!turnState) return;
+    const entry = turnState.turnQueue[turnState.turnIndex];
+    const operative = game.squad.find(o => o.id === entry.unitId);
+    if (!operative) return;
+
+    const cls = CLASSES[operative.classKey];
+    const ability = cls?.abilities?.find(a => a.id === abilityId);
+    if (!ability) return;
+
+    // Check if sufficient resource
+    if (operative.currentResource < ability.cost) return;
+
+    const currentSquad = game.squad;
+    const currentEnemies = mission?.enemies || [];
+
+    if (ability.targetType === "self" || ability.targetType === "allEnemies" || ability.targetType === "allAllies") {
+      // Execute immediately — no target needed
+      const selfTargetId = ability.targetType === "self" ? entry.unitId : null;
+      executeAbilityAndAdvance(abilityId, selfTargetId, currentSquad, currentEnemies);
+    } else if (ability.targetType === "enemy") {
+      setTurnState(ts => ts ? { ...ts, subPhase: "selectAbilityTarget", selectedAbilityId: abilityId } : ts);
+    } else if (ability.targetType === "ally") {
+      setTurnState(ts => ts ? { ...ts, subPhase: "selectAbilityAllyTarget", selectedAbilityId: abilityId } : ts);
+    }
+  }
+
+  function executeAbilityAndAdvance(abilityId, targetId, currentSquad, currentEnemies) {
+    if (!turnState) return;
+    const entry = turnState.turnQueue[turnState.turnIndex];
+
+    const { squad: aSquad, enemies: aEnemies, log: aLog } = executeAbility(entry.unitId, abilityId, targetId, currentSquad, currentEnemies);
+    if (aLog.length > 0) setCombatLog(p => [...p, ...aLog]);
+    applySquadState(aSquad);
+    applyEnemyState(aEnemies);
+
+    // Inject bark
+    injectBark(aLog, aSquad, aEnemies);
+
+    // Check combat end
+    const endResult = checkCombatEnd(aSquad, aEnemies);
+    if (endResult) {
+      handleCombatEnd(endResult, aSquad, aEnemies, turnState);
+      return;
+    }
+
+    // Advance to next turn
+    const nextTs = { ...turnState, turnIndex: turnState.turnIndex + 1, subPhase: "processing" };
+    setTurnState(nextTs);
+    setTimeout(() => advanceTurn(nextTs, aSquad, aEnemies), 300);
+  }
+
+  function chooseAllyTarget(allyId) {
+    if (!turnState || !turnState.selectedAbilityId) return;
+    const currentSquad = game.squad;
+    const currentEnemies = mission?.enemies || [];
+    executeAbilityAndAdvance(turnState.selectedAbilityId, allyId, currentSquad, currentEnemies);
+  }
+
   function chooseStim(stimIndex) {
     const stim = game.stims[stimIndex];
     if (!stim) return;
@@ -253,6 +329,8 @@ export default function useMission(game, setGame, updateGame, setTab) {
 
     } else if (turnState.selectedAction === "item") {
       executeStimAndAdvance(turnState.selectedStimIndex, targetId);
+    } else if (turnState.selectedAction === "ability") {
+      executeAbilityAndAdvance(turnState.selectedAbilityId, targetId, currentSquad, currentEnemies);
     }
   }
 
@@ -283,7 +361,15 @@ export default function useMission(game, setGame, updateGame, setTab) {
   }
 
   function cancelSelection() {
-    setTurnState(ts => ts ? { ...ts, subPhase: "awaitingAction", selectedAction: null, selectedStimIndex: null } : ts);
+    setTurnState(ts => {
+      if (!ts) return ts;
+      // From ability target sub-menus, go back to ability list first
+      if (ts.subPhase === "selectAbilityTarget" || ts.subPhase === "selectAbilityAllyTarget") {
+        return { ...ts, subPhase: "selectAbility", selectedAbilityId: null };
+      }
+      // From ability list or other, go back to main menu
+      return { ...ts, subPhase: "awaitingAction", selectedAction: null, selectedStimIndex: null, selectedAbilityId: null };
+    });
   }
 
   // Medic passives (heals) fire regardless of action type
@@ -453,7 +539,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
 
   function startMission(mt) {
     if (game.squad.filter(o => o.alive).length === 0) return;
-    updateGame(g => ({ ...g, squad: g.squad.map(o => { const s = getEffectiveStats(o); return { ...o, alive: true, currentHp: s.hp, currentShield: s.shield, defending: false }; }) }));
+    updateGame(g => ({ ...g, squad: g.squad.map(o => { const s = getEffectiveStats(o); return { ...o, alive: true, currentHp: s.hp, currentShield: s.shield, defending: false, currentResource: CLASS_BASE_RESOURCE[o.classKey], activeEffects: [] }; }) }));
     const environment = getEnvironmentForMission(mt.id);
     setMission({ type: mt, currentEncounter: 0, totalEncounters: mt.encounters, phase: "briefing", enemies: [], roundNum: 0, decisionApplied: {}, combatStats: { totalRounds: 0, enemiesKilled: 0, operativesDowned: 0 }, debriefPhase: null, prevMissionsCompleted: game.missionsCompleted, environment });
     const currentChapter = STORY_CHAPTERS.filter(ch => game.missionsCompleted >= ch.unlockAt).pop();
@@ -509,7 +595,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
     if (enemyTimerRef.current) clearTimeout(enemyTimerRef.current);
     setMission(null); setDecision(null); setMissionResult(null); setCombatLog([]); setTurnState(null);
     setBanter(null); setStoryReactions([]);
-    updateGame(g => ({ ...g, squad: g.squad.map(o => { const s = getEffectiveStats(o); return { ...o, alive: true, currentHp: s.hp, currentShield: s.shield, defending: false }; }) })); setTab("Squad");
+    updateGame(g => ({ ...g, squad: g.squad.map(o => { const s = getEffectiveStats(o); return { ...o, alive: true, currentHp: s.hp, currentShield: s.shield, defending: false, currentResource: CLASS_BASE_RESOURCE[o.classKey] || 0, activeEffects: [] }; }) })); setTab("Squad");
   }
 
   function advanceDebrief() {
@@ -557,5 +643,6 @@ export default function useMission(game, setGame, updateGame, setTab) {
     // Turn-based action handlers
     selectAttack, selectDefend, selectItem,
     chooseStim, chooseTarget, cancelSelection,
+    selectAbility, chooseAbility, chooseAllyTarget,
   };
 }

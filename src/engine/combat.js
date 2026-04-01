@@ -1,4 +1,5 @@
 import { ENEMY_TEMPLATES } from '../data/enemies';
+import { CLASSES } from '../data/classes';
 import { rng, pick, uid } from './utils';
 import { getEffectiveStats } from './operatives';
 
@@ -165,6 +166,13 @@ export function applyTurnStartEffects(unitId, isAlly, squad, enemies) {
     if (unit.defending) unit.defending = false;
     // Allies don't bleed in current system
     if (unit.stunned) { unit.stunned = false; log.push({ text: `${unit.name} stunned!`, type: "stun" }); canAct = false; }
+    // Tick active effects
+    if (!unit.activeEffects) unit.activeEffects = [];
+    const expiredAlly = [];
+    unit.activeEffects = unit.activeEffects
+      .map(eff => ({ ...eff, remainingRounds: eff.remainingRounds - 1 }))
+      .filter(eff => { if (eff.remainingRounds <= 0) { expiredAlly.push(eff); return false; } return true; });
+    for (const eff of expiredAlly) log.push({ text: `${unit.name.split(' ')[0]}: ${eff.id} expired`, type: eff.type === 'buff' ? 'buff' : 'debuff' });
   } else {
     const unit = e.find(x => x.id === unitId);
     if (!unit || !unit.alive) return { squad: s, enemies: e, log, canAct: false };
@@ -174,6 +182,13 @@ export function applyTurnStartEffects(unitId, isAlly, squad, enemies) {
       log.push({ text: `${unit.name} bleeds ${unit.bleed}`, type: "bleed" });
       if (unit.hp <= 0) { unit.alive = false; log.push({ text: `${unit.name} bleeds out!`, type: "kill" }); canAct = false; }
     }
+    // Tick active effects on enemy
+    if (!unit.activeEffects) unit.activeEffects = [];
+    const expiredEnemy = [];
+    unit.activeEffects = unit.activeEffects
+      .map(eff => ({ ...eff, remainingRounds: eff.remainingRounds - 1 }))
+      .filter(eff => { if (eff.remainingRounds <= 0) { expiredEnemy.push(eff); return false; } return true; });
+    for (const eff of expiredEnemy) log.push({ text: `${unit.name.split(' ')[0]}: ${eff.id} expired`, type: eff.type === 'buff' ? 'buff' : 'debuff' });
   }
 
   return { squad: s, enemies: e, log, canAct };
@@ -192,7 +207,7 @@ export function executeAllyAttack(attackerId, targetId, squad, enemies) {
   const target = e.find(x => x.id === targetId);
   if (!attacker || !attacker.alive || !target || !target.alive) return { squad: s, enemies: e, log };
 
-  const stats = getEffectiveStats(attacker);
+  const stats = getBuffModifiedStats(attacker, true);
   let dmg = stats.damage + rng(-2, 4);
   const isCrit = Math.random() * 100 < (stats.crit || 0);
   if (isCrit) {
@@ -200,8 +215,11 @@ export function executeAllyAttack(attackerId, targetId, squad, enemies) {
     if (stats.executeCrit && target.hp < target.maxHp * 0.3) dmg *= 2;
     if (stats.critBleed) target.bleed = (target.bleed || 0) + stats.critBleed;
   }
-  const armor = Math.max(0, target.armor - (stats.armorPen || 0));
+  const targetStats = getBuffModifiedStats(target, false);
+  const armor = Math.max(0, targetStats.armor - (stats.armorPen || 0));
   dmg = Math.max(1, dmg - Math.floor(armor * 0.4));
+  // Apply damageTaken modifier from debuffs (e.g. Mark Target)
+  if (targetStats.damageTakenMod) dmg = Math.round(dmg * (1 + targetStats.damageTakenMod));
   target.hp -= dmg;
   const killed = target.hp <= 0; if (killed) target.alive = false;
   log.push({ text: `${attacker.icon} ${attacker.name.split(" ")[0]} ▸ ${target.name} ${dmg}${isCrit ? " ★CRIT" : ""}${killed ? " ✘KILL" : ""}`, type: isCrit ? (killed ? "critkill" : "crit") : (killed ? "kill" : "ally") });
@@ -381,11 +399,11 @@ export function executeEnemyTurn(enemyId, squad, enemies) {
   const targets = s.filter(o => o.alive);
   if (targets.length === 0) return { squad: s, enemies: e, log };
 
-  const taunters = targets.filter(o => getEffectiveStats(o).taunt);
+  const taunters = targets.filter(o => getBuffModifiedStats(o, true).taunt);
   const target = taunters.length > 0 && Math.random() > 0.3 ? pick(taunters) : pick(targets);
-  const stats = getEffectiveStats(target);
+  const stats = getBuffModifiedStats(target, true);
 
-  // Evasion check
+  // Evasion check (includes Smoke Bomb evasion buff)
   if (Math.random() * 100 < (stats.evasion || 0)) {
     log.push({ text: `  ${target.name.split(" ")[0]} dodges ${enemy.name}!`, type: "evade" });
     if (stats.evadeCounter) {
@@ -456,4 +474,228 @@ export function checkCombatEnd(squad, enemies) {
   if (squad.every(o => !o.alive)) return "allAlliesDead";
   if (enemies.every(e => !e.alive)) return "allEnemiesDead";
   return null;
+}
+
+// ─── Ability System (Phase 2) ──────────────────────────────────────────────
+// All functions below are PURE: they return new objects, never mutate inputs.
+
+/**
+ * Returns array of abilities the operative has unlocked (skill learned) and
+ * whether each is currently affordable.
+ * Each entry: { ...ability, available: boolean }
+ */
+export function getAvailableAbilities(operative) {
+  const cls = CLASSES[operative.classKey];
+  if (!cls || !cls.abilities) return [];
+  return cls.abilities
+    .filter(a => operative.skills && operative.skills[a.unlockSkill])
+    .map(a => ({ ...a, available: (operative.currentResource || 0) >= a.cost }));
+}
+
+/**
+ * Returns stats with active buff/debuff modifiers applied on top of base stats.
+ * Works for both allies (uses getEffectiveStats) and enemies (uses raw stats).
+ */
+export function getBuffModifiedStats(unit, isAlly = true) {
+  const base = isAlly ? { ...getEffectiveStats(unit) } : { ...unit };
+  const effects = unit.activeEffects || [];
+  for (const eff of effects) {
+    const { stat, modifier } = eff;
+    if (stat === 'armor') {
+      base.armor = Math.round((base.armor || 0) * (1 + modifier));
+    } else if (stat === 'evasion' && modifier > 0) {
+      base.evasion = (base.evasion || 0) + modifier;
+    } else if (stat === 'damage' && modifier > 0) {
+      base.damage = Math.round((base.damage || 0) * (1 + modifier));
+    } else if (stat === 'damageTaken') {
+      base.damageTakenMod = (base.damageTakenMod || 0) + modifier;
+    } else if (stat === 'taunt') {
+      base.taunt = modifier;
+    }
+  }
+  return base;
+}
+
+/**
+ * Execute an ability for an operative.
+ * Returns { squad, enemies, log }.
+ */
+export function executeAbility(attackerId, abilityId, targetId, squad, enemies) {
+  const s = cloneSquad(squad);
+  const e = cloneEnemies(enemies);
+  const log = [];
+
+  const attacker = s.find(o => o.id === attackerId);
+  if (!attacker || !attacker.alive) return { squad: s, enemies: e, log };
+
+  // Ensure activeEffects initialized
+  if (!attacker.activeEffects) attacker.activeEffects = [];
+
+  const cls = CLASSES[attacker.classKey];
+  if (!cls || !cls.abilities) return { squad: s, enemies: e, log };
+  const ability = cls.abilities.find(a => a.id === abilityId);
+  if (!ability) return { squad: s, enemies: e, log };
+
+  // Deduct resource cost
+  attacker.currentResource = Math.max(0, (attacker.currentResource || 0) - ability.cost);
+
+  const { effectType, targetType, effect } = ability;
+
+  if (effectType === 'attack') {
+    if (effect.aoeDamage) {
+      // AoE attack (Orbital Strike)
+      const flatDmg = effect.aoeDamage;
+      for (const en of e.filter(x => x.alive)) {
+        const reduced = Math.max(1, flatDmg - Math.floor((en.armor || 0) * 0.2));
+        en.hp -= reduced;
+        if (en.hp <= 0) en.alive = false;
+      }
+      log.push({ text: `${attacker.icon} ${attacker.name.split(' ')[0]} ▸ ${ability.name} ${flatDmg} AoE!`, type: 'ability' });
+    } else {
+      // Single or multi-hit attack
+      const target = e.find(x => x.id === targetId);
+      if (!target || !target.alive) return { squad: s, enemies: e, log };
+
+      const stats = getEffectiveStats(attacker);
+      const numHits = effect.hits || 1;
+      const mult = effect.damageMultiplier || 1.0;
+      const critBonus = effect.critBonus || 0;
+
+      for (let i = 0; i < numHits; i++) {
+        let dmg = Math.round((stats.damage + rng(-2, 4)) * mult);
+        const critChance = (stats.crit || 0) + critBonus;
+        const isCrit = Math.random() * 100 < critChance;
+        if (isCrit) dmg = Math.round(dmg * 1.8);
+
+        const armorVal = Math.max(0, (target.armor || 0) - (stats.armorPen || 0));
+        dmg = Math.max(1, dmg - Math.floor(armorVal * 0.4));
+
+        // Apply damageTaken modifier from debuffs on target
+        if (target.activeEffects) {
+          const dtMod = target.activeEffects
+            .filter(eff => eff.stat === 'damageTaken')
+            .reduce((sum, eff) => sum + eff.modifier, 0);
+          if (dtMod > 0) dmg = Math.round(dmg * (1 + dtMod));
+        }
+
+        target.hp -= dmg;
+        const killed = target.hp <= 0;
+        if (killed) target.alive = false;
+        const hitLabel = numHits > 1 ? ` (hit ${i + 1})` : '';
+        log.push({ text: `${attacker.icon} ${attacker.name.split(' ')[0]} ▸ ${target.name} ${dmg}${isCrit ? ' ★CRIT' : ''}${killed ? ' ✘KILL' : ''}${hitLabel} [${ability.name}]`, type: isCrit ? (killed ? 'critkill' : 'crit') : (killed ? 'kill' : 'ability') });
+        if (killed) break;
+      }
+    }
+
+  } else if (effectType === 'buff') {
+    const applyBuff = (tgt) => {
+      if (!tgt.activeEffects) tgt.activeEffects = [];
+      if (effect.forceTaunt) {
+        tgt.activeEffects.push({ id: abilityId, type: 'buff', stat: 'taunt', modifier: 1.0, remainingRounds: effect.duration, source: attackerId });
+        log.push({ text: `${attacker.name.split(' ')[0]} taunts enemies! [${ability.name}]`, type: 'buff' });
+      } else if (effect.interceptBy) {
+        // Find target operative to guard
+        const guardTarget = s.find(o => o.id === targetId && o.id !== attackerId);
+        if (guardTarget) {
+          if (!guardTarget.activeEffects) guardTarget.activeEffects = [];
+          guardTarget.activeEffects.push({ id: abilityId, type: 'buff', stat: 'intercepted', modifier: 1, remainingRounds: effect.duration, source: attackerId, interceptedBy: attackerId });
+          attacker.activeEffects.push({ id: abilityId + '_interceptor', type: 'buff', stat: 'intercepting', modifier: 1, remainingRounds: effect.duration, source: attackerId });
+          log.push({ text: `${attacker.name.split(' ')[0]} guards ${guardTarget.name.split(' ')[0]}! [${ability.name}]`, type: 'buff' });
+        }
+      } else if (effect.stat === 'turretActive') {
+        tgt.activeEffects.push({ id: abilityId, type: 'buff', stat: 'turretActive', modifier: effect.turretDmg || 15, remainingRounds: effect.duration, source: attackerId });
+        log.push({ text: `${attacker.name.split(' ')[0]} deploys turret (${effect.duration} rounds)! [${ability.name}]`, type: 'buff' });
+      } else {
+        tgt.activeEffects.push({ id: abilityId, type: 'buff', stat: effect.stat, modifier: effect.modifier, remainingRounds: effect.duration, source: attackerId });
+        log.push({ text: `${tgt.name.split(' ')[0]} +${ability.name} for ${effect.duration} rounds`, type: 'buff' });
+      }
+    };
+
+    if (targetType === 'self') {
+      applyBuff(attacker);
+    } else if (targetType === 'allAllies') {
+      for (const ally of s.filter(o => o.alive)) applyBuff(ally);
+    } else if (targetType === 'ally') {
+      if (!effect.interceptBy) {
+        const ally = s.find(o => o.id === targetId);
+        if (ally && ally.alive) applyBuff(ally);
+      } else {
+        applyBuff(attacker); // intercept is handled inside applyBuff for interceptBy case
+      }
+    }
+
+  } else if (effectType === 'debuff') {
+    if (targetType === 'allEnemies' && effect.stat === 'stunned') {
+      // EMP Blast — stun all
+      for (const en of e.filter(x => x.alive)) {
+        en.stunned = true;
+        if (!en.activeEffects) en.activeEffects = [];
+      }
+      log.push({ text: `${attacker.icon} ${attacker.name.split(' ')[0]} EMP stuns all enemies! [${ability.name}]`, type: 'stun' });
+    } else {
+      // Single-target debuff (Armor Shred, Mark Target)
+      const target = e.find(x => x.id === targetId);
+      if (!target || !target.alive) return { squad: s, enemies: e, log };
+      if (!target.activeEffects) target.activeEffects = [];
+      target.activeEffects.push({ id: abilityId, type: 'debuff', stat: effect.stat, modifier: effect.modifier, remainingRounds: effect.duration, source: attackerId });
+      log.push({ text: `${target.name} debuffed: ${ability.name} (${effect.duration} rounds)`, type: 'debuff' });
+    }
+
+  } else if (effectType === 'heal') {
+    const target = s.find(o => o.id === targetId);
+    if (!target || !target.alive) return { squad: s, enemies: e, log };
+    const maxHp = getEffectiveStats(target).hp;
+    const healAmt = Math.round(maxHp * (effect.healPercent || 0.4));
+    target.currentHp = Math.min(maxHp, (target.currentHp || 0) + healAmt);
+    log.push({ text: `${attacker.icon} ${attacker.name.split(' ')[0]} heals ${target.name.split(' ')[0]} +${healAmt} HP [${ability.name}]`, type: 'heal' });
+
+  } else if (effectType === 'revive') {
+    const target = s.find(o => o.id === targetId);
+    if (!target || target.alive) return { squad: s, enemies: e, log };
+    const maxHp = getEffectiveStats(target).hp;
+    target.alive = true;
+    target.currentHp = Math.round(maxHp * (effect.revivePercent || 0.3));
+    if (!target.activeEffects) target.activeEffects = [];
+    log.push({ text: `${attacker.icon} ${attacker.name.split(' ')[0]} revives ${target.name.split(' ')[0]}! [${ability.name}]`, type: 'heal' });
+
+  } else if (effectType === 'cleanse') {
+    const target = s.find(o => o.id === targetId);
+    if (!target || !target.alive) return { squad: s, enemies: e, log };
+    if (!target.activeEffects) target.activeEffects = [];
+    const before = target.activeEffects.length;
+    target.activeEffects = target.activeEffects.filter(eff => eff.type !== 'debuff');
+    const removed = before - target.activeEffects.length;
+    log.push({ text: `${attacker.icon} ${attacker.name.split(' ')[0]} cleanses ${target.name.split(' ')[0]} (${removed} debuffs removed) [${ability.name}]`, type: 'heal' });
+  }
+
+  return { squad: s, enemies: e, log };
+}
+
+/**
+ * Tick active effects at the start of a unit's turn.
+ * Decrements remainingRounds, removes expired effects, logs expiry.
+ * Returns { squad, enemies, log }.
+ */
+export function tickEffects(unitId, isAlly, squad, enemies) {
+  const s = cloneSquad(squad);
+  const e = cloneEnemies(enemies);
+  const log = [];
+
+  const unit = isAlly ? s.find(o => o.id === unitId) : e.find(x => x.id === unitId);
+  if (!unit) return { squad: s, enemies: e, log };
+  if (!unit.activeEffects) unit.activeEffects = [];
+
+  const expired = [];
+  unit.activeEffects = unit.activeEffects
+    .map(eff => ({ ...eff, remainingRounds: eff.remainingRounds - 1 }))
+    .filter(eff => {
+      if (eff.remainingRounds <= 0) { expired.push(eff); return false; }
+      return true;
+    });
+
+  for (const eff of expired) {
+    log.push({ text: `${unit.name.split(' ')[0]}: ${eff.id} expired`, type: eff.type === 'buff' ? 'buff' : 'debuff' });
+  }
+
+  return { squad: s, enemies: e, log };
 }

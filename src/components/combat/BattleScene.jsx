@@ -6,11 +6,13 @@ import CompactLog from './CompactLog';
 import ActionMenu from './ActionMenu';
 import PartyStatusPanel from './PartyStatusPanel';
 import StimSelector from './StimSelector';
+import AbilitySelector from './AbilitySelector';
 
 export default function BattleScene({
   squad, enemies, turnState, currentEncounter, totalEncounters, roundNum, combatLog, logRef,
   missionTypeName, environment, stims,
   selectAttack, selectDefend, selectItem, chooseStim, chooseTarget, cancelSelection,
+  selectAbility, chooseAbility, chooseAllyTarget,
 }) {
   const currentTurnEntry = turnState?.turnQueue?.[turnState.turnIndex];
   const currentTurnId = currentTurnEntry?.unitId;
@@ -20,10 +22,27 @@ export default function BattleScene({
   // Determine which operative is acting
   const currentOp = isAllyTurn ? squad.find(o => o.id === currentTurnId) : null;
 
-  // Targeting mode: enemies are clickable when selecting attack target
-  const enemyTargetable = subPhase === "selectTarget";
-  // Ally targeting: allies are clickable when selecting item target
-  const allyTargetable = subPhase === "selectItemTarget";
+  // Targeting mode: enemies are clickable when selecting attack target or ability target
+  const enemyTargetable = subPhase === "selectTarget" || subPhase === "selectAbilityTarget";
+  // Ally targeting: allies are clickable when selecting item target or ability ally target
+  const allyTargetable = subPhase === "selectItemTarget" || subPhase === "selectAbilityAllyTarget";
+
+  // Determine the correct handler for choosing a target
+  function handleEnemyClick(enemyId) {
+    if (subPhase === "selectAbilityTarget") {
+      chooseTarget(enemyId);
+    } else {
+      chooseTarget(enemyId);
+    }
+  }
+
+  function handleAllyClick(allyId) {
+    if (subPhase === "selectAbilityAllyTarget") {
+      chooseAllyTarget(allyId);
+    } else {
+      chooseTarget(allyId);
+    }
+  }
 
   return (
     <div className={`battlefield battlefield-ff ${environment?.cssClass || ''}`}>
@@ -46,14 +65,16 @@ export default function BattleScene({
               isAlly={false}
               highlight={currentTurnId === e.id}
               selectable={enemyTargetable}
-              onClick={enemyTargetable ? () => chooseTarget(e.id) : undefined}
+              onClick={enemyTargetable ? () => handleEnemyClick(e.id) : undefined}
             />
           ))}
         </div>
 
         <div className="action-zone ff-action-zone">
           {subPhase === "selectTarget" && <div className="targeting-prompt">Select enemy target</div>}
+          {subPhase === "selectAbilityTarget" && <div className="targeting-prompt">Select enemy target</div>}
           {subPhase === "selectItemTarget" && <div className="targeting-prompt">Select ally target</div>}
+          {subPhase === "selectAbilityAllyTarget" && <div className="targeting-prompt">Select ally target</div>}
           {subPhase === "enemyActing" && <div className="targeting-prompt enemy-acting">Enemy turn...</div>}
           {subPhase === "processing" && <div className="targeting-prompt">...</div>}
         </div>
@@ -69,8 +90,8 @@ export default function BattleScene({
               highlight={currentTurnId === op.id}
               isCurrentTurn={currentTurnId === op.id && isAllyTurn}
               defending={op.defending}
-              selectable={allyTargetable && op.alive}
-              onClick={allyTargetable && op.alive ? () => chooseTarget(op.id) : undefined}
+              selectable={allyTargetable && (op.alive || turnState?.selectedAbilityId === 'revive')}
+              onClick={allyTargetable && (op.alive || turnState?.selectedAbilityId === 'revive') ? () => handleAllyClick(op.id) : undefined}
             />
           ))}
         </div>
@@ -83,7 +104,14 @@ export default function BattleScene({
           {subPhase === "selectItem" && (
             <StimSelector stims={stims || []} onChoose={chooseStim} onCancel={cancelSelection} />
           )}
-          {(subPhase === "awaitingAction" || subPhase === "selectTarget" || subPhase === "selectItemTarget") && (
+          {subPhase === "selectAbility" && (
+            <AbilitySelector
+              operative={currentOp}
+              onChoose={chooseAbility}
+              onCancel={cancelSelection}
+            />
+          )}
+          {(subPhase === "awaitingAction" || subPhase === "selectTarget" || subPhase === "selectItemTarget" || subPhase === "selectAbilityTarget" || subPhase === "selectAbilityAllyTarget") && (
             <ActionMenu
               operative={currentOp}
               turnState={turnState}
@@ -91,9 +119,10 @@ export default function BattleScene({
               onAttack={selectAttack}
               onDefend={selectDefend}
               onItem={selectItem}
+              onAbility={selectAbility}
             />
           )}
-          {subPhase === "selectTarget" && (
+          {(subPhase === "selectTarget" || subPhase === "selectAbilityTarget" || subPhase === "selectAbilityAllyTarget") && (
             <button className="action-cancel-btn" onClick={cancelSelection}>Cancel</button>
           )}
           {subPhase === "selectItemTarget" && (
