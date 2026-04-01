@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { STATUS_EFFECTS } from '../../data/constants';
 
 const ENEMY_ICONS = {
   "Feral Drone": "🤖", "Scav Raider": "🏴", "Spore Beast": "🍄",
@@ -60,6 +61,28 @@ export default function UnitTile({ unit, isAlly, highlight, stats, isCurrentTurn
       {shieldMax > 0 && (
         <div className="unit-tile-shield-bar">
           <div className="bar-fill" style={{ width: `${shieldPct}%` }} />
+        </div>
+      )}
+      {unit.activeEffects?.length > 0 && (
+        <div className="effect-icons">
+          {unit.activeEffects.map((effect, i) => {
+            const def = STATUS_EFFECTS[effect.id];
+            const icon = def ? def.icon : (effect.type === 'buff' ? '▲' : '▼');
+            const name = def ? def.name : effect.id;
+            const desc = def ? def.desc : '';
+            const rounds = effect.remainingRounds ?? effect.duration ?? '?';
+            const isBuff = effect.type === 'buff';
+            const tooltipText = `${name}${desc ? ': ' + desc : ''} (${rounds} round${rounds !== 1 ? 's' : ''} left)`;
+            return (
+              <span
+                key={`${effect.id}-${i}`}
+                className={`effect-icon ${isBuff ? 'effect-icon-buff' : 'effect-icon-debuff'}`}
+                title={tooltipText}
+              >
+                {icon}<span className="effect-duration">{rounds}</span>
+              </span>
+            );
+          })}
         </div>
       )}
       {unit.stunned && <div className="unit-tile-status">STUN</div>}

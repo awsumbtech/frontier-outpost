@@ -3,7 +3,7 @@ import {
   getAvailableAbilities,
   executeAbility,
   getBuffModifiedStats,
-  tickEffects,
+  tickStatusEffects,
   applyTurnStartEffects,
 } from '../combat';
 import { createOperative } from '../operatives';
@@ -633,21 +633,18 @@ describe('getBuffModifiedStats', () => {
   });
 });
 
-// ─── tickEffects ────────────────────────────────────────────────────────────
+// ─── tickStatusEffects ────────────────────────────────────────────────────────
 
-describe('tickEffects', () => {
+describe('tickStatusEffects', () => {
   it('decrements remainingRounds on active effects', () => {
     const op = makeAlly('VANGUARD', 'Tank');
     op.activeEffects = [
       { id: 'shieldWall', type: 'buff', stat: 'armor', modifier: 0.5, remainingRounds: 2 }
     ];
-    const squad = [op];
-    const enemies = [makeEnemy()];
 
-    const { squad: result } = tickEffects(op.id, true, squad, enemies);
-    const resultOp = result.find(o => o.id === op.id);
+    tickStatusEffects(op);
 
-    expect(resultOp.activeEffects[0].remainingRounds).toBe(1);
+    expect(op.activeEffects[0].remainingRounds).toBe(1);
   });
 
   it('removes effects when remainingRounds reaches zero', () => {
@@ -655,13 +652,10 @@ describe('tickEffects', () => {
     op.activeEffects = [
       { id: 'shieldWall', type: 'buff', stat: 'armor', modifier: 0.5, remainingRounds: 1 }
     ];
-    const squad = [op];
-    const enemies = [makeEnemy()];
 
-    const { squad: result } = tickEffects(op.id, true, squad, enemies);
-    const resultOp = result.find(o => o.id === op.id);
+    tickStatusEffects(op);
 
-    expect(resultOp.activeEffects).toHaveLength(0);
+    expect(op.activeEffects).toHaveLength(0);
   });
 
   it('logs effect expiry when an effect is removed', () => {
@@ -669,14 +663,12 @@ describe('tickEffects', () => {
     op.activeEffects = [
       { id: 'shieldWall', type: 'buff', stat: 'armor', modifier: 0.5, remainingRounds: 1 }
     ];
-    const squad = [op];
-    const enemies = [makeEnemy()];
 
-    const { log } = tickEffects(op.id, true, squad, enemies);
+    const { logEntries } = tickStatusEffects(op);
 
-    expect(log).toHaveLength(1);
-    expect(log[0].text).toContain('shieldWall');
-    expect(log[0].text).toContain('expired');
+    expect(logEntries).toHaveLength(1);
+    expect(logEntries[0].text).toContain('ShieldWall');
+    expect(logEntries[0].text.toLowerCase()).toContain('expired');
   });
 
   it('keeps effects that still have rounds remaining', () => {
@@ -684,38 +676,30 @@ describe('tickEffects', () => {
     op.activeEffects = [
       { id: 'smokeBomb', type: 'buff', stat: 'evasion', modifier: 40, remainingRounds: 3 }
     ];
-    const squad = [op];
-    const enemies = [makeEnemy()];
 
-    const { squad: result } = tickEffects(op.id, true, squad, enemies);
-    const resultOp = result.find(o => o.id === op.id);
+    tickStatusEffects(op);
 
-    expect(resultOp.activeEffects).toHaveLength(1);
-    expect(resultOp.activeEffects[0].remainingRounds).toBe(2);
+    expect(op.activeEffects).toHaveLength(1);
+    expect(op.activeEffects[0].remainingRounds).toBe(2);
   });
 
   it('handles tick with no active effects without error', () => {
     const op = makeAlly('VANGUARD', 'Tank');
     op.activeEffects = [];
-    const squad = [op];
-    const enemies = [makeEnemy()];
 
-    expect(() => tickEffects(op.id, true, squad, enemies)).not.toThrow();
+    expect(() => tickStatusEffects(op)).not.toThrow();
   });
 
-  it('ticks effects for enemy units when isAlly is false', () => {
+  it('ticks effects on enemy units', () => {
     const enemy = makeEnemy({
       activeEffects: [
         { id: 'armorShred', type: 'debuff', stat: 'armor', modifier: -0.4, remainingRounds: 2 }
       ]
     });
-    const squad = [makeAlly()];
-    const enemies = [enemy];
 
-    const { enemies: result } = tickEffects(enemy.id, false, squad, enemies);
-    const resultEnemy = result.find(e => e.id === enemy.id);
+    tickStatusEffects(enemy);
 
-    expect(resultEnemy.activeEffects[0].remainingRounds).toBe(1);
+    expect(enemy.activeEffects[0].remainingRounds).toBe(1);
   });
 
   it('logs expiry with correct type for buff effects', () => {
@@ -723,12 +707,10 @@ describe('tickEffects', () => {
     op.activeEffects = [
       { id: 'shieldWall', type: 'buff', stat: 'armor', modifier: 0.5, remainingRounds: 1 }
     ];
-    const squad = [op];
-    const enemies = [makeEnemy()];
 
-    const { log } = tickEffects(op.id, true, squad, enemies);
+    const { logEntries } = tickStatusEffects(op);
 
-    expect(log[0].type).toBe('buff');
+    expect(logEntries[0].type).toBe('expired');
   });
 
   it('logs expiry with correct type for debuff effects', () => {
@@ -736,12 +718,10 @@ describe('tickEffects', () => {
     op.activeEffects = [
       { id: 'armorShred', type: 'debuff', stat: 'armor', modifier: -0.4, remainingRounds: 1 }
     ];
-    const squad = [op];
-    const enemies = [makeEnemy()];
 
-    const { log } = tickEffects(op.id, true, squad, enemies);
+    const { logEntries } = tickStatusEffects(op);
 
-    expect(log[0].type).toBe('debuff');
+    expect(logEntries[0].type).toBe('expired');
   });
 });
 
@@ -788,7 +768,7 @@ describe('applyTurnStartEffects — effect ticking', () => {
 
     const expiryLog = log.find(l => l.text.includes('expired'));
     expect(expiryLog).toBeDefined();
-    expect(expiryLog.text).toContain('smokeBomb');
+    expect(expiryLog.text.toLowerCase()).toContain('smokebomb');
   });
 });
 

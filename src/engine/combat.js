@@ -2,6 +2,7 @@ import { ENEMY_TEMPLATES } from '../data/enemies';
 import { CLASSES } from '../data/classes';
 import { rng, pick, uid } from './utils';
 import { getEffectiveStats } from './operatives';
+import { STATUS_EFFECTS } from '../data/constants';
 
 export function generateEncounter(tier, encounterNum) {
   const enemies = ENEMY_TEMPLATES.filter(e => e.tier <= tier && e.tier >= tier - 1);
@@ -9,8 +10,10 @@ export function generateEncounter(tier, encounterNum) {
   return Array.from({ length: count }, () => {
     const t = pick(enemies);
     const scale = 1 + (tier - 1) * 0.15 + encounterNum * 0.05;
-    return { id: uid(), ...t, hp: Math.round(t.hp * scale), maxHp: Math.round(t.hp * scale),
+    const instance = { id: uid(), ...t, hp: Math.round(t.hp * scale), maxHp: Math.round(t.hp * scale),
       armor: Math.round(t.armor * scale), damage: Math.round(t.damage * scale), speed: t.speed, alive: true, stunned: false, bleed: 0 };
+    if (t.abilities) instance.abilityCooldowns = {};
+    return instance;
   });
 }
 
@@ -166,13 +169,10 @@ export function applyTurnStartEffects(unitId, isAlly, squad, enemies) {
     if (unit.defending) unit.defending = false;
     // Allies don't bleed in current system
     if (unit.stunned) { unit.stunned = false; log.push({ text: `${unit.name} stunned!`, type: "stun" }); canAct = false; }
-    // Tick active effects
+    // Process DoT effects before decrementing
     if (!unit.activeEffects) unit.activeEffects = [];
-    const expiredAlly = [];
-    unit.activeEffects = unit.activeEffects
-      .map(eff => ({ ...eff, remainingRounds: eff.remainingRounds - 1 }))
-      .filter(eff => { if (eff.remainingRounds <= 0) { expiredAlly.push(eff); return false; } return true; });
-    for (const eff of expiredAlly) log.push({ text: `${unit.name.split(' ')[0]}: ${eff.id} expired`, type: eff.type === 'buff' ? 'buff' : 'debuff' });
+    const dotResultAlly = tickStatusEffects(unit);
+    for (const entry of dotResultAlly.logEntries) log.push(entry);
   } else {
     const unit = e.find(x => x.id === unitId);
     if (!unit || !unit.alive) return { squad: s, enemies: e, log, canAct: false };
@@ -182,13 +182,14 @@ export function applyTurnStartEffects(unitId, isAlly, squad, enemies) {
       log.push({ text: `${unit.name} bleeds ${unit.bleed}`, type: "bleed" });
       if (unit.hp <= 0) { unit.alive = false; log.push({ text: `${unit.name} bleeds out!`, type: "kill" }); canAct = false; }
     }
-    // Tick active effects on enemy
+    // Process DoT effects and tick active effects on enemy
     if (!unit.activeEffects) unit.activeEffects = [];
-    const expiredEnemy = [];
-    unit.activeEffects = unit.activeEffects
-      .map(eff => ({ ...eff, remainingRounds: eff.remainingRounds - 1 }))
-      .filter(eff => { if (eff.remainingRounds <= 0) { expiredEnemy.push(eff); return false; } return true; });
-    for (const eff of expiredEnemy) log.push({ text: `${unit.name.split(' ')[0]}: ${eff.id} expired`, type: eff.type === 'buff' ? 'buff' : 'debuff' });
+    const dotResultEnemy = tickStatusEffects(unit);
+    for (const entry of dotResultEnemy.logEntries) log.push(entry);
+    if (dotResultEnemy.totalDotDamage > 0 && unit.hp <= 0) {
+      unit.alive = false;
+      canAct = false;
+    }
   }
 
   return { squad: s, enemies: e, log, canAct };
@@ -505,8 +506,10 @@ export function getBuffModifiedStats(unit, isAlly = true) {
       base.armor = Math.round((base.armor || 0) * (1 + modifier));
     } else if (stat === 'evasion' && modifier > 0) {
       base.evasion = (base.evasion || 0) + modifier;
-    } else if (stat === 'damage' && modifier > 0) {
+    } else if (stat === 'damage') {
       base.damage = Math.round((base.damage || 0) * (1 + modifier));
+    } else if (stat === 'speed') {
+      base.speed = Math.round((base.speed || 0) * (1 + modifier));
     } else if (stat === 'damageTaken') {
       base.damageTakenMod = (base.damageTakenMod || 0) + modifier;
     } else if (stat === 'taunt') {
@@ -645,7 +648,7 @@ export function executeAbility(attackerId, abilityId, targetId, squad, enemies) 
     const target = s.find(o => o.id === targetId);
     if (!target || !target.alive) return { squad: s, enemies: e, log };
     const maxHp = getEffectiveStats(target).hp;
-    const healAmt = Math.round(maxHp * (effect.healPercent || 0.4));
+    const healAmt = Math.round(maxHp * (effect.healPercent || 0.4) * getHealingModifier(target));
     target.currentHp = Math.min(maxHp, (target.currentHp || 0) + healAmt);
     log.push({ text: `${attacker.icon} ${attacker.name.split(' ')[0]} heals ${target.name.split(' ')[0]} +${healAmt} HP [${ability.name}]`, type: 'heal' });
 
@@ -671,20 +674,122 @@ export function executeAbility(attackerId, abilityId, targetId, squad, enemies) 
   return { squad: s, enemies: e, log };
 }
 
-/**
- * Tick active effects at the start of a unit's turn.
- * Decrements remainingRounds, removes expired effects, logs expiry.
- * Returns { squad, enemies, log }.
- */
-export function tickEffects(unitId, isAlly, squad, enemies) {
-  const s = cloneSquad(squad);
-  const e = cloneEnemies(enemies);
-  const log = [];
+// ─── Status Effect Functions (Phase 3) ───────────────────────────────────────
+// All functions are PURE: they mutate the unit object passed in (caller must
+// pass a clone) and return log entries / results.
 
-  const unit = isAlly ? s.find(o => o.id === unitId) : e.find(x => x.id === unitId);
-  if (!unit) return { squad: s, enemies: e, log };
+/**
+ * Apply a status effect to a unit (mutates unit.activeEffects in place).
+ * Returns a log message string.
+ *
+ * @param {object} unit - the unit object (already a clone)
+ * @param {string} effectId - key from STATUS_EFFECTS (e.g. 'bleed', 'poison')
+ * @param {string} source - id of the unit applying the effect
+ * @param {object} [options] - reserved for future use
+ */
+export function applyStatusEffect(unit, effectId, source, options = {}) {
+  const def = STATUS_EFFECTS[effectId];
+  if (!def) return `Unknown effect: ${effectId}`;
   if (!unit.activeEffects) unit.activeEffects = [];
 
+  const unitName = unit.name ? unit.name.split(' ')[0] : 'Unit';
+  const sourceName = source || 'unknown';
+
+  if (def.type === 'dot' && def.maxStacks > 1) {
+    // Stackable DoT (Bleed): each stack is a separate entry
+    const existing = unit.activeEffects.filter(e => e.id === effectId);
+    if (existing.length < def.maxStacks) {
+      unit.activeEffects.push({
+        id: effectId,
+        type: def.type,
+        damagePerStack: def.damagePerStack,
+        remainingRounds: def.duration,
+        source,
+      });
+    } else {
+      // At max stacks — refresh duration of oldest
+      const oldest = existing.reduce((a, b) => (a.remainingRounds <= b.remainingRounds ? a : b));
+      oldest.remainingRounds = def.duration;
+    }
+  } else if (def.type === 'dot' && def.maxStacks === 1) {
+    // Non-stacking DoT (Poison): refresh duration if already present
+    const existing = unit.activeEffects.find(e => e.id === effectId);
+    if (existing) {
+      existing.remainingRounds = def.duration;
+    } else {
+      unit.activeEffects.push({
+        id: effectId,
+        type: def.type,
+        damage: def.damage,
+        remainingRounds: def.duration,
+        source,
+      });
+    }
+  } else {
+    // Stat-based effect (slow, weaken, fortify)
+    unit.activeEffects.push({
+      id: effectId,
+      type: def.type,
+      stat: def.stat,
+      modifier: def.modifier,
+      remainingRounds: def.duration,
+      source,
+    });
+  }
+
+  return `${sourceName} applies ${def.name} to ${unitName}!`;
+}
+
+/**
+ * Remove ALL instances of effectId from unit.activeEffects (mutates in place).
+ * Returns a log message string.
+ *
+ * @param {object} unit - the unit object (already a clone)
+ * @param {string} effectId - key from STATUS_EFFECTS
+ */
+export function removeStatusEffect(unit, effectId) {
+  if (!unit.activeEffects) { unit.activeEffects = []; return `No effects to remove`; }
+  const before = unit.activeEffects.length;
+  unit.activeEffects = unit.activeEffects.filter(e => e.id !== effectId);
+  const removed = before - unit.activeEffects.length;
+  const unitName = unit.name ? unit.name.split(' ')[0] : 'Unit';
+  return `${removed} ${effectId} effect(s) removed from ${unitName}`;
+}
+
+/**
+ * Process all active effects on a unit for one turn (mutates unit in place):
+ * - Apply DoT damage (bleed / poison)
+ * - Decrement remainingRounds on ALL effects
+ * - Remove expired effects
+ * Returns { logEntries: Array<{text, type}>, totalDotDamage: number }
+ *
+ * @param {object} unit - the unit object (already a clone)
+ */
+export function tickStatusEffects(unit) {
+  if (!unit.activeEffects) unit.activeEffects = [];
+  const logEntries = [];
+  let totalDotDamage = 0;
+  const unitName = unit.name ? unit.name.split(' ')[0] : 'Unit';
+
+  // Apply DoT damage first (before decrementing)
+  for (const eff of unit.activeEffects) {
+    if (eff.type !== 'dot') continue;
+    if (eff.id === 'bleed') {
+      const dmg = eff.damagePerStack || 5;
+      const hpField = unit.currentHp !== undefined ? 'currentHp' : 'hp';
+      unit[hpField] = Math.max(0, (unit[hpField] || 0) - dmg);
+      totalDotDamage += dmg;
+      logEntries.push({ text: `${unitName} takes ${dmg} bleed damage`, type: 'bleed' });
+    } else if (eff.id === 'poison') {
+      const dmg = eff.damage || 8;
+      const hpField = unit.currentHp !== undefined ? 'currentHp' : 'hp';
+      unit[hpField] = Math.max(0, (unit[hpField] || 0) - dmg);
+      totalDotDamage += dmg;
+      logEntries.push({ text: `${unitName} takes ${dmg} poison damage`, type: 'poison' });
+    }
+  }
+
+  // Decrement all effects and collect expired
   const expired = [];
   unit.activeEffects = unit.activeEffects
     .map(eff => ({ ...eff, remainingRounds: eff.remainingRounds - 1 }))
@@ -694,8 +799,99 @@ export function tickEffects(unitId, isAlly, squad, enemies) {
     });
 
   for (const eff of expired) {
-    log.push({ text: `${unit.name.split(' ')[0]}: ${eff.id} expired`, type: eff.type === 'buff' ? 'buff' : 'debuff' });
+    logEntries.push({
+      text: `${eff.id.charAt(0).toUpperCase() + eff.id.slice(1)} on ${unitName} expired`,
+      type: 'expired',
+    });
   }
 
-  return { squad: s, enemies: e, log };
+  return { logEntries, totalDotDamage };
+}
+
+/**
+ * Returns the healing modifier for a unit.
+ * Poisoned units receive only 50% healing.
+ *
+ * @param {object} unit
+ * @returns {number} 0.5 if poisoned, 1.0 otherwise
+ */
+export function getHealingModifier(unit) {
+  const effects = unit.activeEffects || [];
+  if (effects.some(e => e.id === 'poison')) return 0.5;
+  return 1.0;
+}
+
+/**
+ * Check whether an enemy should use an ability this turn and apply it.
+ * Mutates the passed-in enemy and target objects (caller must pass clones).
+ * Returns { used, abilityName, targetName, logEntry } if an ability fired,
+ * or null if the enemy should make a normal attack.
+ *
+ * @param {object} enemy  - the enemy instance (already a clone)
+ * @param {Array}  squad  - array of operative objects (already clones)
+ * @param {Array}  enemies - full enemies array (already clones, used for self-target)
+ */
+export function executeEnemyAbility(enemy, squad, enemies) {
+  if (!enemy.abilities || enemy.abilities.length === 0) return null;
+
+  // Save-compatibility: ensure cooldown map exists
+  if (!enemy.abilityCooldowns) enemy.abilityCooldowns = {};
+
+  const aliveOperatives = squad.filter(o => o.alive);
+
+  for (const ability of enemy.abilities) {
+    // Skip if on cooldown
+    if ((enemy.abilityCooldowns[ability.id] || 0) > 0) continue;
+
+    // Chance roll
+    if (Math.random() >= ability.chance) continue;
+
+    // Ability fires — determine target
+    let target = null;
+
+    if (ability.appliesEffect) {
+      if (ability.targetType === 'self') {
+        target = enemy;
+      } else {
+        // 'random' or 'enemy' — pick a random alive operative
+        if (aliveOperatives.length === 0) continue;
+        target = aliveOperatives[Math.floor(Math.random() * aliveOperatives.length)];
+      }
+      applyStatusEffect(target, ability.appliesEffect, enemy.id || enemy.name);
+    }
+
+    if (ability.drainMp) {
+      // Pick a random alive operative and drain their resource
+      if (aliveOperatives.length === 0) continue;
+      const drainTarget = aliveOperatives[Math.floor(Math.random() * aliveOperatives.length)];
+      drainTarget.currentResource = Math.max(0, (drainTarget.currentResource || 0) - ability.drainMp);
+      target = drainTarget;
+    }
+
+    // Set cooldown
+    enemy.abilityCooldowns[ability.id] = ability.cooldown;
+
+    const targetName = target ? target.name : 'unknown';
+    return {
+      used: true,
+      abilityName: ability.name,
+      targetName,
+      logEntry: `${enemy.name} uses ${ability.name} on ${targetName}!`,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Decrement all cooldown values on an enemy by 1, clamped to 0.
+ * Mutates enemy.abilityCooldowns in place.
+ *
+ * @param {object} enemy - the enemy instance
+ */
+export function tickEnemyCooldowns(enemy) {
+  if (!enemy.abilityCooldowns) return;
+  for (const key of Object.keys(enemy.abilityCooldowns)) {
+    enemy.abilityCooldowns[key] = Math.max(0, enemy.abilityCooldowns[key] - 1);
+  }
 }

@@ -85,7 +85,7 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 .log-kill{color:var(--danger);font-weight:bold;text-shadow:0 0 8px rgba(var(--glow-danger),0.5)}.log-allyDown{color:#ff6b81;font-weight:bold;background:rgba(255,71,87,.08);padding:0 4px;border-radius:3px}
 .log-heal{color:var(--success);text-shadow:0 0 6px rgba(var(--glow-success),0.4)}.log-evade{color:#a78bfa;font-style:italic}.log-counter{color:#a78bfa}
 .log-stun{color:#fbbf24}.log-turret{color:#fbbf24}.log-double{color:#67e8f9}.log-aoe{color:#fb923c;font-weight:bold;text-shadow:0 0 6px rgba(var(--glow-warning),0.4)}
-.log-bleed{color:#f87171}.log-decision{color:var(--purple);font-weight:bold}.log-info{color:var(--text2)}.log-header{color:var(--accent);font-weight:bold;font-size:14px;text-shadow:0 0 8px rgba(var(--glow-accent),0.5)}
+.log-bleed{color:#f87171}.log-poison{color:#a855f7}.log-decision{color:var(--purple);font-weight:bold}.log-info{color:var(--text2)}.log-header{color:var(--accent);font-weight:bold;font-size:14px;text-shadow:0 0 8px rgba(var(--glow-accent),0.5)}
 .log-critkill{text-shadow:0 0 8px rgba(var(--glow-danger),0.5)}
 
 /* ─── MISSION LAYOUT ─── */
@@ -528,6 +528,18 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 /* Buff/debuff indicators in party status */
 .party-status-buff{font-size:8px;font-weight:700;color:var(--success);background:rgba(46,213,115,0.12);padding:0 3px;border-radius:2px;line-height:1.4}
 .party-status-debuff{font-size:8px;font-weight:700;color:var(--danger);background:rgba(255,71,87,0.12);padding:0 3px;border-radius:2px;line-height:1.4}
+
+/* ─── STATUS EFFECT ICONS ─── */
+.effect-icons{display:flex;gap:2px;flex-wrap:wrap;margin-top:2px}
+.effect-icon{display:inline-flex;align-items:center;font-size:0.7rem;padding:1px 3px;border-radius:3px;cursor:default;font-family:'Share Tech Mono',monospace;line-height:1}
+.effect-icon-buff{background:rgba(0,200,80,0.12);border:1px solid rgba(0,200,80,0.25);color:rgba(0,220,100,0.9)}
+.effect-icon-debuff{background:rgba(255,50,50,0.12);border:1px solid rgba(255,50,50,0.25);color:rgba(255,100,100,0.9)}
+.effect-duration{font-size:0.6rem;margin-left:1px;opacity:0.65;font-family:'Share Tech Mono',monospace}
+
+/* ─── COMBAT LOG EFFECT ENTRY TYPES ─── */
+.log-ability{color:#d4902a}
+.log-dot{color:#f06060}
+.log-expired{color:#5a6278;font-style:italic}
 
 /* Stim Selector */
 .stim-selector{padding:4px 0}

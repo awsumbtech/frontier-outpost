@@ -1,5 +1,31 @@
 import { getEffectiveStats } from '../../engine/operatives';
-import { CLASS_RESOURCE_NAMES, CLASS_RESOURCE_COLORS, CLASS_BASE_RESOURCE } from '../../data/constants';
+import { CLASS_RESOURCE_NAMES, CLASS_RESOURCE_COLORS, CLASS_BASE_RESOURCE, STATUS_EFFECTS } from '../../data/constants';
+
+function EffectIconRow({ effects }) {
+  if (!effects || effects.length === 0) return null;
+  return (
+    <div className="effect-icons">
+      {effects.map((effect, i) => {
+        const def = STATUS_EFFECTS[effect.id];
+        const icon = def ? def.icon : (effect.type === 'buff' ? '▲' : '▼');
+        const name = def ? def.name : effect.id;
+        const desc = def ? def.desc : '';
+        const rounds = effect.remainingRounds ?? effect.duration ?? '?';
+        const isBuff = effect.type === 'buff';
+        const tooltipText = `${name}${desc ? ': ' + desc : ''} (${rounds} round${rounds !== 1 ? 's' : ''} left)`;
+        return (
+          <span
+            key={`${effect.id}-${i}`}
+            className={`effect-icon ${isBuff ? 'effect-icon-buff' : 'effect-icon-debuff'}`}
+            title={tooltipText}
+          >
+            {icon}<span className="effect-duration">{rounds}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function PartyStatusPanel({ squad, currentTurnId }) {
   return (
@@ -14,16 +40,14 @@ export default function PartyStatusPanel({ squad, currentTurnId }) {
         const resourcePct = maxResource > 0 ? Math.max(0, ((op.currentResource || 0) / maxResource) * 100) : 0;
         const resourceColor = CLASS_RESOURCE_COLORS[op.classKey] || "#a78bfa";
         const resourceName = CLASS_RESOURCE_NAMES[op.classKey] || "MP";
-        const buffs = (op.activeEffects || []).filter(e => e.type === "buff");
-        const debuffs = (op.activeEffects || []).filter(e => e.type === "debuff");
+        const activeEffects = op.activeEffects || [];
 
         return (
           <div key={op.id} className={`party-status-row${!op.alive ? " party-status-dead" : ""}${isCurrent ? " party-status-active" : ""}`}>
             <span className="party-status-icon">{op.icon}</span>
             <span className="party-status-name">{op.name.split(" ")[0]}</span>
             {op.defending && <span className="party-status-def">DEF</span>}
-            {buffs.length > 0 && <span className="party-status-buff" title={buffs.map(b => b.id).join(', ')}>▲{buffs.length}</span>}
-            {debuffs.length > 0 && <span className="party-status-debuff" title={debuffs.map(d => d.id).join(', ')}>▼{debuffs.length}</span>}
+            <EffectIconRow effects={activeEffects} />
             <div className="party-status-bars">
               <div className="party-status-hp-bar">
                 <div className="bar-fill" style={{ width: `${hpPct}%`, background: hpColor }} />

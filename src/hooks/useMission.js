@@ -20,6 +20,8 @@ import {
   checkCombatEnd,
   getAvailableAbilities,
   executeAbility,
+  executeEnemyAbility,
+  tickEnemyCooldowns,
 } from "../engine/combat";
 import { getEnvironmentForMission } from "../engine/environments";
 import { selectBark, selectBanter, getInlineStory, getDecisionEcho, getEnvFlavor, selectStoryReaction, selectDeathReaction } from "../engine/personality";
@@ -157,6 +159,34 @@ export default function useMission(game, setGame, updateGame, setTab) {
   }
 
   function processEnemyTurn(ts, entry, currentSquad, currentEnemies) {
+    // Check if enemy should use an ability instead of a normal attack
+    const abilitySquad = currentSquad.map(o => ({ ...o }));
+    const abilityEnemies = currentEnemies.map(e => ({ ...e }));
+    const abilityEnemy = abilityEnemies.find(e => e.id === entry.unitId);
+
+    if (abilityEnemy) {
+      const abilityResult = executeEnemyAbility(abilityEnemy, abilitySquad, abilityEnemies);
+      if (abilityResult !== null) {
+        // Ability was used — apply the mutated state and log, skip normal attack
+        setCombatLog(p => [...p, { text: abilityResult.logEntry, type: "ability" }]);
+        applySquadState(abilitySquad);
+        applyEnemyState(abilityEnemies);
+
+        injectBark([{ text: abilityResult.logEntry }], abilitySquad, abilityEnemies);
+
+        const endResult = checkCombatEnd(abilitySquad, abilityEnemies);
+        if (endResult) {
+          handleCombatEnd(endResult, abilitySquad, abilityEnemies, ts);
+          return;
+        }
+
+        const nextTs = { ...ts, turnIndex: ts.turnIndex + 1 };
+        setTurnState(nextTs);
+        enemyTimerRef.current = setTimeout(() => advanceTurn(nextTs, abilitySquad, abilityEnemies), 600);
+        return;
+      }
+    }
+
     const { squad: etSquad, enemies: etEnemies, log: etLog } =
       executeEnemyTurn(entry.unitId, currentSquad, currentEnemies);
     if (etLog.length > 0) setCombatLog(p => [...p, ...etLog]);
@@ -407,7 +437,13 @@ export default function useMission(game, setGame, updateGame, setTab) {
     const { squad: reSquad, enemies: reEnemies, log: reLog } = applyRoundEndEffects(currentSquad, currentEnemies);
     if (reLog.length > 0) setCombatLog(p => [...p, ...reLog]);
     applySquadState(reSquad);
-    applyEnemyState(reEnemies);
+
+    // Tick enemy ability cooldowns at end of each round
+    const cdEnemies = reEnemies.map(e => ({ ...e }));
+    for (const enemy of cdEnemies.filter(e => e.alive)) {
+      tickEnemyCooldowns(enemy);
+    }
+    applyEnemyState(cdEnemies);
 
     // Check for mid-round decision (every 3 rounds)
     if (ts.roundNum % 3 === 0) {
@@ -421,7 +457,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
 
     // Continue to next round
     // startRound reads mission via closure; just call it directly after a delay
-    const missionSnapshot = { ...mission, enemies: reEnemies };
+    const missionSnapshot = { ...mission, enemies: cdEnemies };
     setTimeout(() => startRound(missionSnapshot, reSquad, ts.roundNum), 200);
   }
 
