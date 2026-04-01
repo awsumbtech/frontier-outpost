@@ -89,7 +89,7 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 .log-critkill{text-shadow:0 0 8px rgba(var(--glow-danger),0.5)}
 
 /* ─── MISSION LAYOUT ─── */
-.mission-layout{display:flex;flex-direction:column;height:100%;min-height:0}
+.mission-layout{display:flex;flex-direction:column;height:100%;min-height:0;max-width:none!important;width:100%!important}
 .mission-top{flex-shrink:0}.mission-log-area{flex:1;min-height:0;display:flex;flex-direction:column;margin:var(--space-xs) 0}
 .sticky-bar{flex-shrink:0;padding:var(--space-sm) 0 0 0;border-top:1px solid var(--border)}
 .sticky-bar .decision-panel{background:linear-gradient(135deg,rgba(192,132,252,.1),rgba(0,212,255,.06));border:1px solid rgba(192,132,252,.3);border-radius:8px;padding:var(--space-md);margin-bottom:var(--space-sm)}
@@ -418,6 +418,95 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 .memorial-name{color:var(--text);font-weight:600}
 .memorial-traits{font-size:var(--font-xxs);font-style:italic;opacity:0.5;margin-left:auto}
 
+/* ─── FF TURN-BASED COMBAT ─── */
+
+/* FF layout: enemies left, allies right */
+.battle-field-ff{grid-template-columns:1fr 40px 1fr;overflow-y:auto;gap:6px;padding:6px 8px}
+.battlefield-ff .enemy-formation{justify-self:end}
+.battlefield-ff .ally-formation{justify-self:start}
+.battlefield-ff .enemy-formation,.battlefield-ff .ally-formation{gap:4px}
+.ff-formation{min-width:80px}
+.ff-action-zone{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px}
+
+/* Compact unit tiles in FF mode */
+.battlefield-ff .unit-tile{width:85px;min-height:70px;padding:4px 4px 3px;gap:1px}
+.battlefield-ff .unit-tile-icon{font-size:22px}
+.battlefield-ff .unit-tile-name{font-size:9px}
+.battlefield-ff .unit-tile-hp-bar{height:4px}
+.battlefield-ff .unit-tile-shield-bar{height:3px}
+.battlefield-ff .unit-tile-level{top:3px;right:3px;font-size:7px;padding:0 3px}
+.battlefield-ff .unit-tile-dead-overlay{font-size:24px}
+
+/* Targeting prompt in action zone */
+.targeting-prompt{font-size:9px;font-family:'Share Tech Mono',monospace;color:var(--accent);text-transform:uppercase;letter-spacing:1px;animation:targetPulse 1.2s ease infinite;text-align:center;padding:2px 4px}
+.targeting-prompt.enemy-acting{color:var(--danger);animation:none}
+@keyframes targetPulse{0%,100%{opacity:0.5}50%{opacity:1}}
+
+/* Current turn indicator — bright glow, distinct from highlight */
+.unit-tile.unit-current-turn{border-color:var(--accent)!important;border-width:2px;box-shadow:0 0 20px rgba(var(--glow-accent),0.5),inset 0 0 10px rgba(var(--glow-accent),0.15);animation:currentTurnGlow 1s ease infinite alternate}
+@keyframes currentTurnGlow{0%{box-shadow:0 0 12px rgba(var(--glow-accent),0.3),inset 0 0 6px rgba(var(--glow-accent),0.1)}100%{box-shadow:0 0 24px rgba(var(--glow-accent),0.6),inset 0 0 12px rgba(var(--glow-accent),0.2)}}
+
+/* Selectable / targetable units */
+.unit-tile.unit-selectable{cursor:pointer;border-color:var(--warning)!important;animation:selectablePulse 0.8s ease infinite alternate;position:relative;z-index:4}
+.unit-tile.unit-selectable:hover{border-color:var(--accent)!important;box-shadow:0 0 16px rgba(var(--glow-accent),0.5);transform:scale(1.05)}
+@keyframes selectablePulse{0%{box-shadow:0 0 4px rgba(255,165,0,0.2)}100%{box-shadow:0 0 12px rgba(255,165,0,0.5)}}
+
+/* Defending unit */
+.unit-tile.unit-defending{background:rgba(0,140,255,0.08);border-color:rgba(0,140,255,0.4)!important}
+.unit-tile.unit-defending::after{content:"🛡";position:absolute;top:4px;left:4px;font-size:10px;opacity:0.7}
+.unit-tile-defend-status{color:var(--accent)!important;font-weight:700}
+
+/* Bottom panels — FF style split layout */
+.ff-bottom-panels{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px 8px;position:relative;z-index:3;background:rgba(10,12,16,0.98);border-top:1px solid var(--border);flex-shrink:0}
+
+/* Party Status Panel — bottom left */
+.party-status-panel{display:flex;flex-direction:column;gap:2px;padding:2px 0}
+.party-status-row{display:flex;align-items:center;gap:4px;padding:2px 4px;border-radius:var(--radius-sm);font-size:var(--font-xxs);font-family:'Share Tech Mono',monospace}
+.party-status-row.party-status-active{background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2)}
+.party-status-row.party-status-dead{opacity:0.3;text-decoration:line-through}
+.party-status-icon{font-size:14px;width:20px;text-align:center}
+.party-status-name{width:60px;color:var(--text);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.party-status-def{color:var(--accent);font-size:8px;font-weight:700;background:rgba(0,212,255,0.15);padding:1px 3px;border-radius:2px}
+.party-status-bars{flex:1;display:flex;flex-direction:column;gap:2px}
+.party-status-hp-bar{height:6px;background:rgba(0,0,0,0.4);border-radius:3px;overflow:hidden}
+.party-status-hp-bar .bar-fill{height:100%;border-radius:3px;transition:width 0.3s}
+.party-status-shield-bar{height:3px;background:rgba(0,0,0,0.3);border-radius:2px;overflow:hidden}
+.party-status-shield-bar .bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s}
+.party-status-hp-text{width:55px;text-align:right;font-size:9px;color:var(--text2)}
+
+/* Action Menu — bottom right */
+.action-menu{padding:2px 0}
+.action-menu-header{display:flex;align-items:center;gap:4px;padding:2px 4px;margin-bottom:4px;font-size:var(--font-xxs);font-weight:700;color:var(--accent);font-family:'Share Tech Mono',monospace;text-transform:uppercase;letter-spacing:0.5px}
+.action-menu-icon{font-size:14px}
+.action-menu-buttons{display:flex;gap:4px}
+.action-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 4px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all 0.15s;color:var(--text)}
+.action-btn:hover:not(:disabled){border-color:var(--accent);background:rgba(0,212,255,0.08);transform:translateY(-1px)}
+.action-btn:active:not(:disabled){transform:translateY(0)}
+.action-btn:disabled{opacity:0.3;cursor:not-allowed}
+.action-btn-icon{font-size:16px}
+.action-btn-label{font-size:9px;font-family:'Share Tech Mono',monospace;text-transform:uppercase;letter-spacing:0.5px}
+.action-btn-attack:hover:not(:disabled){border-color:var(--danger);background:rgba(255,71,87,0.08)}
+.action-btn-defend:hover:not(:disabled){border-color:var(--accent);background:rgba(0,140,255,0.08)}
+.action-btn-item:hover:not(:disabled){border-color:var(--success);background:rgba(46,213,115,0.08)}
+
+/* Cancel button for target selection */
+.action-cancel-btn{width:100%;padding:6px;margin-top:4px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);font-size:var(--font-xxs);font-family:'Share Tech Mono',monospace;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px}
+.action-cancel-btn:hover{border-color:var(--danger);color:var(--danger)}
+
+/* Stim Selector */
+.stim-selector{padding:4px 0}
+.stim-selector-header{display:flex;justify-content:space-between;align-items:center;padding:4px 6px;margin-bottom:6px;font-size:var(--font-xs);font-weight:700;color:var(--success);font-family:'Share Tech Mono',monospace;text-transform:uppercase}
+.stim-selector-cancel{background:none;border:1px solid var(--border);color:var(--text2);padding:2px 8px;border-radius:var(--radius-sm);cursor:pointer;font-size:var(--font-xxs);font-family:'Share Tech Mono',monospace}
+.stim-selector-cancel:hover{border-color:var(--danger);color:var(--danger)}
+.stim-selector-list{display:flex;flex-direction:column;gap:4px}
+.stim-selector-item{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all 0.15s;text-align:left}
+.stim-selector-item:hover{border-color:var(--success);background:rgba(46,213,115,0.06)}
+.stim-icon{font-size:16px;width:24px;text-align:center}
+.stim-info{flex:1;display:flex;flex-direction:column;gap:1px}
+.stim-name{font-size:var(--font-xxs);font-weight:700;color:var(--text);font-family:'Share Tech Mono',monospace}
+.stim-desc{font-size:9px;color:var(--text2)}
+.stim-count{font-size:var(--font-xxs);color:var(--text2);font-family:'Share Tech Mono',monospace}
+
 /* ─── DESKTOP ─── */
 @media(min-width:900px){
   :root{--font-body:18px;--font-sm:15px;--font-xs:13px;--font-xxs:11px;--font-lg:24px;--font-xl:32px}
@@ -432,4 +521,20 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
   .compact-log{max-height:110px;font-size:var(--font-xs)}
   .btn{padding:12px 20px;font-size:var(--font-sm)}
   .modal{max-width:560px}
+
+  /* FF desktop enhancements */
+  .ff-bottom-panels{padding:8px 24px;gap:12px}
+  .action-btn{padding:10px 8px}
+  .action-btn-icon{font-size:20px}
+  .action-btn-label{font-size:var(--font-xxs)}
+  .battlefield-ff .unit-tile{width:120px;min-height:90px;padding:6px 5px 5px;gap:2px}
+  .battlefield-ff .unit-tile-icon{font-size:28px}
+  .battlefield-ff .unit-tile-name{font-size:var(--font-xxs)}
+  .battlefield-ff .unit-tile-hp-bar{height:5px}
+  .battlefield-ff .unit-tile-level{font-size:8px}
+  .battle-field-ff{gap:8px;padding:8px 24px}
+  .battlefield-ff .enemy-formation,.battlefield-ff .ally-formation{gap:6px}
+  .party-status-name{width:80px}
+  .party-status-row{padding:3px 8px;gap:8px}
+  .party-status-hp-text{font-size:var(--font-xxs)}
 }

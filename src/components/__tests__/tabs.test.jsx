@@ -64,7 +64,7 @@ describe('MissionTab', () => {
   it('renders mission select when no active mission', () => {
     const game = makeGame();
     const { container } = render(
-      <MissionTab game={game} mission={null} combatLog={[]} decision={null} missionResult={null} logRef={{ current: null }} animation={null} skipAnimation={vi.fn()} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} />
+      <MissionTab game={game} mission={null} combatLog={[]} decision={null} missionResult={null} logRef={{ current: null }} turnState={null} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} selectAttack={vi.fn()} selectDefend={vi.fn()} selectItem={vi.fn()} chooseStim={vi.fn()} chooseTarget={vi.fn()} cancelSelection={vi.fn()} />
     );
     expect(container.textContent).toContain('Avg Level');
     expect(container.textContent).toContain('0 completed');
@@ -86,11 +86,11 @@ describe('MissionTab', () => {
     };
     const log = [{ text: 'Round 1', type: 'round' }];
     const { container } = render(
-      <MissionTab game={game} mission={mission} combatLog={log} decision={null} missionResult={null} logRef={{ current: null }} animation={null} skipAnimation={vi.fn()} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} />
+      <MissionTab game={game} mission={mission} combatLog={log} decision={null} missionResult={null} logRef={{ current: null }} turnState={null} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} selectAttack={vi.fn()} selectDefend={vi.fn()} selectItem={vi.fn()} chooseStim={vi.fn()} chooseTarget={vi.fn()} cancelSelection={vi.fn()} />
     );
     expect(container.textContent).toContain(MISSIONS[0].name);
     expect(container.textContent).toContain('1/3');
-    expect(container.textContent).toContain('Next Round');
+    expect(container.textContent).toContain('Abort');
   });
 
   it('renders debrief panel on result phase', () => {
@@ -109,7 +109,7 @@ describe('MissionTab', () => {
     const result = { success: true, xp: 100, credits: 50, loot: [], combatStats: mission.combatStats, newBeats: [] };
     const advanceDebrief = vi.fn();
     const { container } = render(
-      <MissionTab game={game} mission={mission} combatLog={[]} decision={null} missionResult={result} logRef={{ current: null }} animation={null} skipAnimation={vi.fn()} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={advanceDebrief} />
+      <MissionTab game={game} mission={mission} combatLog={[]} decision={null} missionResult={result} logRef={{ current: null }} turnState={null} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={advanceDebrief} selectAttack={vi.fn()} selectDefend={vi.fn()} selectItem={vi.fn()} chooseStim={vi.fn()} chooseTarget={vi.fn()} cancelSelection={vi.fn()} />
     );
     expect(container.textContent).toContain('MISSION COMPLETE');
     expect(container.textContent).toContain('5'); // rounds
@@ -137,7 +137,7 @@ describe('MissionTab', () => {
     };
     const result = { success: true, xp: 100, credits: 50, loot: [], combatStats: mission.combatStats, newBeats: [{ sender: 'CMD Vasquez', text: 'Good work on the sweep.', chapterId: 'ch1', at: 1 }] };
     const { container } = render(
-      <MissionTab game={game} mission={mission} combatLog={[]} decision={null} missionResult={result} logRef={{ current: null }} animation={null} skipAnimation={vi.fn()} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} />
+      <MissionTab game={game} mission={mission} combatLog={[]} decision={null} missionResult={result} logRef={{ current: null }} turnState={null} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} selectAttack={vi.fn()} selectDefend={vi.fn()} selectItem={vi.fn()} chooseStim={vi.fn()} chooseTarget={vi.fn()} cancelSelection={vi.fn()} />
     );
     expect(container.textContent).toContain('INCOMING TRANSMISSION');
     expect(container.textContent).toContain('CMD Vasquez');

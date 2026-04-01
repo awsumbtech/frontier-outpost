@@ -4,7 +4,12 @@ import { ENEMY_TEMPLATES } from '../../data/enemies';
 import { RARITY_NAMES, RARITY_COLORS } from '../../data/constants';
 import BattleScene from '../combat/BattleScene';
 
-export default function MissionTab({ game, mission, combatLog, decision, missionResult, logRef, animation, advanceAnimation, skipAnimation, banter, storyReactions, startMission, advanceMission, handleDecision, resetMission, advanceDebrief }) {
+export default function MissionTab({
+  game, mission, combatLog, decision, missionResult, logRef, turnState,
+  banter, storyReactions,
+  startMission, advanceMission, handleDecision, resetMission, advanceDebrief,
+  selectAttack, selectDefend, selectItem, chooseStim, chooseTarget, cancelSelection,
+}) {
   if (!mission) {
     const avg = game.squad.length>0?Math.round(game.squad.reduce((s,o)=>s+o.level,0)/game.squad.length):1;
     const completed = game.completedMissions || {};
@@ -82,7 +87,7 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
     <BattleScene
       squad={game.squad}
       enemies={mission.enemies}
-      animation={animation}
+      turnState={turnState}
       currentEncounter={mission.currentEncounter}
       totalEncounters={mission.totalEncounters}
       roundNum={mission.roundNum}
@@ -90,6 +95,13 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
       logRef={logRef}
       missionTypeName={mission.type.name}
       environment={mission.environment}
+      stims={game.stims}
+      selectAttack={selectAttack}
+      selectDefend={selectDefend}
+      selectItem={selectItem}
+      chooseStim={chooseStim}
+      chooseTarget={chooseTarget}
+      cancelSelection={cancelSelection}
     />
     <div className="sticky-bar">
       {decision&&mission.phase==="decision"&&(
@@ -189,9 +201,6 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
           </div>
         )}
         {mission.phase==="briefing"&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceMission}>Begin Mission</button>}
-        {mission.phase==="combat"&&!decision&&!animation&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceMission}>Next Round ▸</button>}
-        {animation&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceAnimation}>Next ▸</button>}
-        {animation&&<button className="btn" onClick={skipAnimation}>Skip ▸▸</button>}
         {mission.phase==="result"&&mission.debriefPhase==="stats"&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceDebrief}>Continue</button>}
         {mission.phase==="result"&&mission.debriefPhase==="comms"&&(()=>{
           const beats = missionResult?.newBeats||[];

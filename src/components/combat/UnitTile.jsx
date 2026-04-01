@@ -7,7 +7,7 @@ const ENEMY_ICONS = {
   "Apex Predator": "🦎", "Core Guardian": "💎",
 };
 
-export default function UnitTile({ unit, isAlly, highlight, stats }) {
+export default function UnitTile({ unit, isAlly, highlight, stats, isCurrentTurn, defending, selectable, onClick }) {
   const [flashing, setFlashing] = useState(false);
   const hp = isAlly ? unit.currentHp : unit.hp;
   const maxHp = isAlly ? stats.hp : unit.maxHp;
@@ -38,10 +38,19 @@ export default function UnitTile({ unit, isAlly, highlight, stats }) {
     !unit.alive && "unit-dead",
     highlight && "unit-highlight",
     flashing && "unit-damage-flash",
+    isCurrentTurn && "unit-current-turn",
+    defending && "unit-defending",
+    selectable && "unit-selectable",
   ].filter(Boolean).join(" ");
 
   return (
-    <div className={cls} style={unitColor ? { '--unit-color': unitColor } : undefined}>
+    <div
+      className={cls}
+      style={unitColor ? { '--unit-color': unitColor } : undefined}
+      onClick={selectable && onClick ? onClick : undefined}
+      role={selectable ? "button" : undefined}
+      tabIndex={selectable ? 0 : undefined}
+    >
       {isAlly && <span className="unit-tile-level">L{unit.level}</span>}
       <div className="unit-tile-icon">{icon}</div>
       <div className="unit-tile-name">{name}</div>
@@ -54,6 +63,7 @@ export default function UnitTile({ unit, isAlly, highlight, stats }) {
         </div>
       )}
       {unit.stunned && <div className="unit-tile-status">STUN</div>}
+      {defending && <div className="unit-tile-status unit-tile-defend-status">DEF</div>}
       {!unit.alive && <div className="unit-tile-dead-overlay">✕</div>}
     </div>
   );

@@ -15,7 +15,7 @@ function initState() {
   s2.gear.armor = generateGear("armor", "RECON", 1);
   const es1 = getEffectiveStats(s1); s1.currentHp = es1.hp; s1.currentShield = es1.shield;
   const es2 = getEffectiveStats(s2); s2.currentHp = es2.hp; s2.currentShield = es2.shield;
-  return { squad: [s1, s2], inventory: [generateGear("gadget", null, 1), generateGear("implant", null, 1), generateGear("weapon", "ENGINEER", 1)], credits: 200, missionsCompleted: 0, storyBeatsRead: {}, stims: [{ ...STIM_TYPES[0] }, { ...STIM_TYPES[0] }], completedMissions: {}, decisionHistory: {}, memorial: [], settings: { stepThroughCombat: true } };
+  return { squad: [s1, s2], inventory: [generateGear("gadget", null, 1), generateGear("implant", null, 1), generateGear("weapon", "ENGINEER", 1)], credits: 200, missionsCompleted: 0, storyBeatsRead: {}, stims: [{ ...STIM_TYPES[0] }, { ...STIM_TYPES[0] }], completedMissions: {}, decisionHistory: {}, memorial: [], settings: {} };
 }
 
 export default function useGameState() {

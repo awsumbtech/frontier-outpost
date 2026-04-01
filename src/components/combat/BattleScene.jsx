@@ -2,61 +2,106 @@ import { getEffectiveStats } from '../../engine/operatives';
 import UnitTile from './UnitTile';
 import TurnOrderBar from './TurnOrderBar';
 import MissionProgressDots from './MissionProgressDots';
-import ActionBanner from './ActionBanner';
 import CompactLog from './CompactLog';
+import ActionMenu from './ActionMenu';
+import PartyStatusPanel from './PartyStatusPanel';
+import StimSelector from './StimSelector';
 
-export default function BattleScene({ squad, enemies, animation, currentEncounter, totalEncounters, roundNum, combatLog, logRef, missionTypeName, environment }) {
-  // Merge animation display states over real state
-  const displaySquad = animation?.displayAllies
-    ? squad.map(op => {
-        const d = animation.displayAllies.find(a => a.id === op.id);
-        return d ? { ...op, currentHp: d.currentHp, currentShield: d.currentShield, alive: d.alive } : op;
-      })
-    : squad;
+export default function BattleScene({
+  squad, enemies, turnState, currentEncounter, totalEncounters, roundNum, combatLog, logRef,
+  missionTypeName, environment, stims,
+  selectAttack, selectDefend, selectItem, chooseStim, chooseTarget, cancelSelection,
+}) {
+  const currentTurnEntry = turnState?.turnQueue?.[turnState.turnIndex];
+  const currentTurnId = currentTurnEntry?.unitId;
+  const isAllyTurn = currentTurnEntry?.isAlly;
+  const subPhase = turnState?.subPhase;
 
-  const displayEnemies = animation?.displayEnemies
-    ? enemies.map(e => {
-        const d = animation.displayEnemies.find(x => x.id === e.id);
-        return d ? { ...e, hp: d.hp, alive: d.alive, stunned: d.stunned, bleed: d.bleed } : e;
-      })
-    : enemies;
+  // Determine which operative is acting
+  const currentOp = isAllyTurn ? squad.find(o => o.id === currentTurnId) : null;
+
+  // Targeting mode: enemies are clickable when selecting attack target
+  const enemyTargetable = subPhase === "selectTarget";
+  // Ally targeting: allies are clickable when selecting item target
+  const allyTargetable = subPhase === "selectItemTarget";
 
   return (
-    <div className={`battlefield ${environment?.cssClass || ''}`}>
+    <div className={`battlefield battlefield-ff ${environment?.cssClass || ''}`}>
       {environment && (
         <>
           <div className="env-background" style={{ backgroundImage: `url(${environment.backgroundImage})` }} />
           <div className={`env-atmosphere ${environment.atmosphere.map(a => `atmo-${a}`).join(' ')}`} />
         </>
       )}
-      <TurnOrderBar squad={displaySquad} enemies={displayEnemies} highlightId={animation?.highlightId} />
+      <TurnOrderBar squad={squad} enemies={enemies} highlightId={currentTurnId} />
       <MissionProgressDots current={currentEncounter} total={totalEncounters} roundNum={roundNum} missionName={missionTypeName} />
-      <div className="battle-field-area">
-        <div className="ally-formation">
-          {displaySquad.map(op => (
+
+      <div className="battle-field-area battle-field-ff">
+        {/* Enemies on LEFT (FF style) */}
+        <div className="enemy-formation ff-formation">
+          {enemies.filter(e => e.alive).map(e => (
+            <UnitTile
+              key={e.id}
+              unit={e}
+              isAlly={false}
+              highlight={currentTurnId === e.id}
+              selectable={enemyTargetable}
+              onClick={enemyTargetable ? () => chooseTarget(e.id) : undefined}
+            />
+          ))}
+        </div>
+
+        <div className="action-zone ff-action-zone">
+          {subPhase === "selectTarget" && <div className="targeting-prompt">Select enemy target</div>}
+          {subPhase === "selectItemTarget" && <div className="targeting-prompt">Select ally target</div>}
+          {subPhase === "enemyActing" && <div className="targeting-prompt enemy-acting">Enemy turn...</div>}
+          {subPhase === "processing" && <div className="targeting-prompt">...</div>}
+        </div>
+
+        {/* Allies on RIGHT (FF style) */}
+        <div className="ally-formation ff-formation">
+          {squad.map(op => (
             <UnitTile
               key={op.id}
               unit={op}
               isAlly
               stats={getEffectiveStats(op)}
-              highlight={animation?.highlightId === op.id}
-            />
-          ))}
-        </div>
-        <div className="action-zone">
-          <ActionBanner animation={animation} />
-        </div>
-        <div className="enemy-formation">
-          {(animation ? displayEnemies : displayEnemies.filter(e => e.alive)).map(e => (
-            <UnitTile
-              key={e.id}
-              unit={e}
-              isAlly={false}
-              highlight={animation?.highlightId === e.id}
+              highlight={currentTurnId === op.id}
+              isCurrentTurn={currentTurnId === op.id && isAllyTurn}
+              defending={op.defending}
+              selectable={allyTargetable && op.alive}
+              onClick={allyTargetable && op.alive ? () => chooseTarget(op.id) : undefined}
             />
           ))}
         </div>
       </div>
+
+      {/* Bottom panels — FF style */}
+      <div className="ff-bottom-panels">
+        <PartyStatusPanel squad={squad} currentTurnId={currentTurnId} />
+        <div className="ff-right-panel">
+          {subPhase === "selectItem" && (
+            <StimSelector stims={stims || []} onChoose={chooseStim} onCancel={cancelSelection} />
+          )}
+          {(subPhase === "awaitingAction" || subPhase === "selectTarget" || subPhase === "selectItemTarget") && (
+            <ActionMenu
+              operative={currentOp}
+              turnState={turnState}
+              stims={stims}
+              onAttack={selectAttack}
+              onDefend={selectDefend}
+              onItem={selectItem}
+            />
+          )}
+          {subPhase === "selectTarget" && (
+            <button className="action-cancel-btn" onClick={cancelSelection}>Cancel</button>
+          )}
+          {subPhase === "selectItemTarget" && (
+            <button className="action-cancel-btn" onClick={cancelSelection}>Cancel</button>
+          )}
+        </div>
+      </div>
+
       <CompactLog combatLog={combatLog} logRef={logRef} />
     </div>
   );
