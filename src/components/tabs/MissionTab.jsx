@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { MISSIONS } from '../../data/missions';
 import { STORY_CHAPTERS } from '../../data/story';
 import { ENEMY_TEMPLATES } from '../../data/enemies';
@@ -11,6 +12,8 @@ export default function MissionTab({
   selectAttack, selectDefend, selectItem, chooseStim, chooseTarget, cancelSelection,
   selectAbility, chooseAbility, chooseAllyTarget,
 }) {
+  const [selectedChapter, setSelectedChapter] = useState(null);
+
   if (!mission) {
     const avg = game.squad.length>0?Math.round(game.squad.reduce((s,o)=>s+o.level,0)/game.squad.length):1;
     const completed = game.completedMissions || {};
@@ -23,42 +26,50 @@ export default function MissionTab({
       else break;
     }
 
+    // Default to first unlocked chapter if none selected
+    const activeChapter = selectedChapter || [...unlockedChapters].pop() || "ch1";
+    const activeCh = STORY_CHAPTERS.find(c => c.id === activeChapter);
+    const activeChMissions = MISSIONS.filter(m => m.chapter === activeChapter);
+    const isActiveUnlocked = unlockedChapters.has(activeChapter);
+
     return (<div>
       <div style={{fontSize:"var(--font-xs)",color:"var(--text2)",marginBottom:8}}>Avg Level {avg} · {game.missionsCompleted} completed</div>
-      {chapterOrder.map(chId => {
-        const ch = STORY_CHAPTERS.find(c => c.id === chId);
-        if (!ch) return null;
-        const chMissions = MISSIONS.filter(m => m.chapter === chId);
-        const isUnlocked = unlockedChapters.has(chId);
-        const allDone = chMissions.every(m => completed[m.id]);
-        const doneCount = chMissions.filter(m => completed[m.id]).length;
 
-        return (<div key={chId} style={{marginBottom:12}}>
-          <div style={{
-            display:"flex",alignItems:"center",gap:8,padding:"8px 12px",
-            background: isUnlocked ? (allDone ? "rgba(46,213,115,0.08)" : "rgba(0,212,255,0.06)") : "rgba(0,0,0,0.2)",
-            border: `1px solid ${allDone ? "rgba(46,213,115,0.3)" : isUnlocked ? "rgba(0,212,255,0.2)" : "var(--border)"}`,
-            borderRadius:8,marginBottom:6,
-            opacity: isUnlocked ? 1 : 0.45,minHeight:40
-          }}>
-            {allDone && <span style={{color:"var(--success)",fontSize:14}}>✓</span>}
-            {!allDone && isUnlocked && <span style={{color:"var(--accent)",fontSize:12}}>▸</span>}
-            {!isUnlocked && <span style={{color:"var(--text2)",fontSize:12}}>🔒</span>}
-            <span style={{fontWeight:700,fontSize:"var(--font-sm)",color:allDone?"var(--success)":isUnlocked?"var(--accent)":"var(--text2)",flex:1}}>{ch.title}</span>
-            <span style={{fontSize:"var(--font-xxs)",fontFamily:"'Share Tech Mono',monospace",color:"var(--text2)"}}>{doneCount}/{chMissions.length}</span>
-          </div>
+      <div className="chapter-tabs">
+        {chapterOrder.map((chId, ci) => {
+          const ch = STORY_CHAPTERS.find(c => c.id === chId);
+          if (!ch) return null;
+          const chMissions = MISSIONS.filter(m => m.chapter === chId);
+          const isUnlocked = unlockedChapters.has(chId);
+          const allDone = chMissions.every(m => completed[m.id]);
+          const doneCount = chMissions.filter(m => completed[m.id]).length;
+          const isActive = chId === activeChapter;
 
-          {isUnlocked && chMissions.map((mt, mi) => {
+          return (<button key={chId}
+            className={`chapter-tab${isActive?" active":""}${allDone?" chapter-done":""}${!isUnlocked?" chapter-locked":""}`}
+            onClick={() => isUnlocked && setSelectedChapter(chId)}
+            disabled={!isUnlocked}>
+            {allDone && <span>✓</span>}
+            {!isUnlocked && <span>🔒</span>}
+            <span>Ch.{ci+1}</span>
+            <span className="ch-progress">{doneCount}/{chMissions.length}</span>
+          </button>);
+        })}
+      </div>
+
+      {isActiveUnlocked ? (
+        <div className="mission-grid">
+          {activeChMissions.map((mt, mi) => {
             const isDone = !!completed[mt.id];
             const timesCleared = completed[mt.id] || 0;
-            const prevDone = mi === 0 || !!completed[chMissions[mi - 1].id];
+            const prevDone = mi === 0 || !!completed[activeChMissions[mi - 1].id];
             const isAvailable = isDone || prevDone;
             const levelDiff = avg - mt.recLevel;
             const diffColor = levelDiff >= 2 ? "var(--success)" : levelDiff >= 0 ? "var(--accent)" : levelDiff >= -2 ? "var(--warning)" : "var(--danger)";
             const diffLabel = levelDiff >= 2 ? "Easy" : levelDiff >= 0 ? "Fair" : levelDiff >= -2 ? "Hard" : "Brutal";
 
             return (<div className={`mission-card${!isAvailable?" mission-locked":""}`} key={mt.id} onClick={()=>isAvailable&&startMission(mt)}
-              style={{borderLeftWidth:3,borderLeftStyle:"solid",borderLeftColor:isDone?"var(--success)":isAvailable?"var(--border2)":"var(--border)",marginLeft:8,opacity:isAvailable?1:0.4,cursor:isAvailable?"pointer":"default"}}>
+              style={{borderLeftWidth:3,borderLeftStyle:"solid",borderLeftColor:isDone?"var(--success)":isAvailable?"var(--border2)":"var(--border)",opacity:isAvailable?1:0.4,cursor:isAvailable?"pointer":"default"}}>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 {isDone && <span style={{color:"var(--success)",fontSize:13,fontWeight:700}}>✓</span>}
                 {!isDone && !isAvailable && <span style={{color:"var(--text2)",fontSize:12}}>🔒</span>}
@@ -75,12 +86,12 @@ export default function MissionTab({
               </div>
             </div>);
           })}
-
-          {!isUnlocked && (<div style={{marginLeft:8,padding:"8px 10px",border:"1px dashed var(--border)",borderRadius:6,fontSize:"var(--font-xs)",color:"var(--text2)",fontStyle:"italic"}}>
-            Complete all {chapterOrder[chapterOrder.indexOf(chId)-1] && STORY_CHAPTERS.find(c=>c.id===chapterOrder[chapterOrder.indexOf(chId)-1])?.title} missions to unlock
-          </div>)}
-        </div>);
-      })}
+        </div>
+      ) : (
+        <div style={{padding:"16px",border:"1px dashed var(--border)",borderRadius:6,fontSize:"var(--font-xs)",color:"var(--text2)",textAlign:"center",fontStyle:"italic"}}>
+          Complete previous chapter missions to unlock
+        </div>
+      )}
     </div>);
   }
 

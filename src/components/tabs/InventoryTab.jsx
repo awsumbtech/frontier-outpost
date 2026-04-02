@@ -19,37 +19,7 @@ export default function InventoryTab({ game, invFilter, setInvFilter, stimTarget
   };
 
   return (<div className="armory-tab">
-    {/* COMBAT STIMS */}
-    <div className="armory-section">
-      <div className="armory-section-header">
-        <span className="armory-section-title">COMBAT STIMS</span>
-        <span className="armory-section-count">{stims.length} IN STOCK</span>
-      </div>
-      <div className="stim-tray">
-        {STIM_TYPES.map(st => {
-          const count = stims.filter(s => s.id === st.id).length;
-          return (
-            <div key={st.id} className="stim-card" style={{'--stim-color': st.color}}>
-              <div className="stim-icon-bg"><span className="stim-icon">{st.icon}</span></div>
-              <span className="stim-name">{st.name}</span>
-              <span className="stim-desc">{st.desc}</span>
-              <div className="stim-bottom">
-                <span className="stim-count">×{count}</span>
-                <button className="stim-buy" disabled={game.credits < st.cost} onClick={() => buyStim(st)}>{st.cost}¢</button>
-              </div>
-              {count > 0 && <button className="stim-use" onClick={() => {
-                const idx = stims.findIndex(s => s.id === st.id);
-                if (idx === -1) return;
-                if (st.id === "nano_kit" || st.id === "purge_shot") { useStim(idx, null); }
-                else { setStimTarget({ stimIdx: idx, stim: stims[idx] }); }
-              }}>USE</button>}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-
-    {/* GEAR LOCKER */}
+    {/* GEAR LOCKER — primary content */}
     <div className="armory-section">
       <div className="armory-section-header">
         <span className="armory-section-title">GEAR LOCKER</span>
@@ -108,6 +78,36 @@ export default function InventoryTab({ game, invFilter, setInvFilter, stimTarget
           })}
         </div>
       )}
+    </div>
+
+    {/* CONSUMABLES — secondary, compact strip */}
+    <div className="armory-section">
+      <div className="armory-section-header">
+        <span className="armory-section-title">CONSUMABLES</span>
+        <span className="armory-section-count">{stims.length} IN STOCK</span>
+      </div>
+      <div className="stim-strip">
+        {STIM_TYPES.map(st => {
+          const count = stims.filter(s => s.id === st.id).length;
+          return (
+            <div key={st.id} className="stim-chip" style={{'--stim-color': st.color}}>
+              <span className="stim-chip-icon">{st.icon}</span>
+              <div className="stim-chip-info">
+                <span className="stim-chip-name">{st.name}</span>
+                <span className="stim-chip-desc">{st.desc}</span>
+              </div>
+              <span className="stim-chip-count">×{count}</span>
+              <button className="stim-chip-buy" disabled={game.credits < st.cost} onClick={() => buyStim(st)}>{st.cost}¢</button>
+              {count > 0 && <button className="stim-chip-use" onClick={() => {
+                const idx = stims.findIndex(s => s.id === st.id);
+                if (idx === -1) return;
+                if (st.id === "nano_kit" || st.id === "purge_shot") { useStim(idx, null); }
+                else { setStimTarget({ stimIdx: idx, stim: stims[idx] }); }
+              }}>USE</button>}
+            </div>
+          );
+        })}
+      </div>
     </div>
 
     {/* STIM TARGET MODAL */}

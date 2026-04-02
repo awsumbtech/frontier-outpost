@@ -17,8 +17,8 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
     linear-gradient(to top,rgba(var(--glow-accent),0.25) 0,rgba(var(--glow-accent),0.25) 2px,transparent 2px) 100% 100%/2px 24px no-repeat}
 
 /* ─── TOP BAR ─── */
-.top-bar{display:flex;align-items:center;justify-content:space-between;padding:var(--space-md) var(--space-lg);background:var(--bg2);border-bottom:1px solid rgba(var(--glow-accent),0.15);min-height:44px;flex-shrink:0}
-.top-bar h1{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;text-shadow:0 0 10px rgba(var(--glow-accent),0.5)}
+.top-bar{display:flex;align-items:center;justify-content:space-between;padding:var(--space-md) var(--space-xl);background:var(--bg2);border-bottom:1px solid rgba(var(--glow-accent),0.2);min-height:48px;flex-shrink:0}
+.top-bar h1{font-family:'Share Tech Mono',monospace;font-size:14px;color:var(--accent);letter-spacing:3px;text-transform:uppercase;text-shadow:0 0 12px rgba(var(--glow-accent),0.6)}
 .top-bar .credits{font-family:'Share Tech Mono',monospace;color:var(--warning);font-size:var(--font-xs);font-weight:700}
 .top-bar .meta{font-family:'Share Tech Mono',monospace;color:var(--text2);font-size:var(--font-xxs)}
 .top-bar .status-group{display:flex;gap:14px;align-items:center}
@@ -57,9 +57,9 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 .bar-label{display:flex;justify-content:space-between;font-size:var(--font-xxs);font-family:'Share Tech Mono',monospace;color:var(--text2);margin-top:2px}
 
 /* ─── GEAR SLOTS ─── */
-.gear-slot{display:flex;align-items:center;gap:var(--space-sm);padding:10px var(--space-md);background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-md);margin:var(--space-xs) 0;font-size:var(--font-sm);cursor:pointer;transition:all .15s;min-height:var(--touch-min)}
-.gear-slot:hover{border-color:var(--accent);box-shadow:0 0 8px rgba(var(--glow-accent),0.08)}
-.gear-slot .slot-label{color:var(--text2);min-width:54px;text-transform:uppercase;font-size:var(--font-xxs);letter-spacing:.5px;font-weight:700}
+.gear-slot{display:flex;align-items:center;gap:var(--space-sm);padding:10px var(--space-md);background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:var(--radius-md);margin:var(--space-xs) 0;font-size:var(--font-sm);cursor:pointer;transition:all .2s;min-height:var(--touch-min)}
+.gear-slot:hover{border-color:var(--accent);box-shadow:0 0 10px rgba(var(--glow-accent),0.1);background:rgba(0,212,255,0.03)}
+.gear-slot .slot-label{color:var(--accent);min-width:54px;text-transform:uppercase;font-size:var(--font-xxs);letter-spacing:1px;font-weight:700;font-family:'Share Tech Mono',monospace}
 
 /* ─── BUTTONS ─── */
 .btn{padding:10px 16px;border:1px solid var(--border2);border-radius:6px;background:var(--bg3);color:var(--text);font-family:'Chakra Petch',sans-serif;font-size:var(--font-sm);font-weight:600;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.5px;min-height:var(--touch-min)}
@@ -68,8 +68,8 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 .btn-danger{background:rgba(255,71,87,.12);border-color:var(--danger);color:var(--danger)}.btn-danger:hover{box-shadow:0 0 12px rgba(var(--glow-danger),0.2)}.btn-sm{padding:6px 10px;font-size:var(--font-xs);min-height:36px}
 
 /* ─── SKILL TREE ─── */
-.branch{margin:var(--space-sm) 0;padding:var(--space-sm);border:1px solid var(--border);border-radius:8px}
-.branch-title{font-size:var(--font-sm);font-weight:600;margin-bottom:var(--space-xs);display:flex;align-items:center;gap:var(--space-xs)}
+.branch{margin:var(--space-sm) 0;padding:var(--space-md);border:1px solid var(--border);border-radius:var(--radius-lg);background:rgba(0,0,0,0.15)}
+.branch-title{font-size:var(--font-sm);font-weight:700;margin-bottom:var(--space-sm);display:flex;align-items:center;gap:var(--space-xs);padding-bottom:var(--space-sm);border-bottom:1px solid var(--border)}
 .skill-node{display:flex;align-items:center;gap:var(--space-sm);padding:var(--space-sm) var(--space-md);margin:var(--space-xs) 0;background:rgba(0,0,0,.2);border-radius:6px;border:1px solid var(--border);cursor:pointer;transition:all .15s;font-size:var(--font-sm);position:relative;margin-left:16px;min-height:var(--touch-min)}
 .skill-node:hover{border-color:var(--accent)}.skill-node.learned{border-color:var(--success);background:rgba(46,213,115,.08)}
 .skill-node .cost{font-family:'Share Tech Mono',monospace;font-size:var(--font-xxs);color:var(--warning);white-space:nowrap}
@@ -110,7 +110,8 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 .enemy-unit .mini-stats .ms-val{color:var(--danger)}
 
 .units-row{display:flex;gap:var(--space-xs);flex-wrap:wrap;margin-bottom:var(--space-xs)}
-.section-label{font-size:var(--font-xxs);text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin:var(--space-sm) 0 var(--space-xs) 0}
+.section-label{font-size:var(--font-xxs);text-transform:uppercase;letter-spacing:2px;color:var(--accent);margin:var(--space-lg) 0 var(--space-sm) 0;font-family:'Share Tech Mono',monospace;font-weight:700;display:flex;align-items:center;gap:8px}
+.section-label::after{content:"";flex:1;height:1px;background:linear-gradient(to right,var(--border),transparent)}
 .class-badge{font-size:var(--font-xxs);padding:1px 5px;border-radius:3px;font-family:'Share Tech Mono',monospace;white-space:nowrap}
 .scrap-value{font-family:'Share Tech Mono',monospace;font-size:var(--font-xs);color:var(--warning);white-space:nowrap}
 .tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:var(--font-xxs);font-family:'Share Tech Mono',monospace;text-transform:uppercase}
@@ -128,10 +129,25 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 /* ─── ARMORY ─── */
 .armory-tab{display:flex;flex-direction:column;gap:var(--space-xl)}
 .armory-section{display:flex;flex-direction:column;gap:10px}
-.armory-section-header{display:flex;justify-content:space-between;align-items:center}
-.armory-section-title{font-size:var(--font-xs);font-weight:700;color:var(--text);letter-spacing:2px;font-family:'Share Tech Mono',monospace}
-.armory-section-count{font-size:9px;font-weight:500;color:var(--text2);font-family:'Share Tech Mono',monospace}
+.armory-section-header{display:flex;justify-content:space-between;align-items:center;padding-bottom:var(--space-sm);border-bottom:1px solid var(--border);margin-bottom:var(--space-sm)}
+.armory-section-title{font-size:var(--font-xs);font-weight:700;color:var(--accent);letter-spacing:2px;font-family:'Share Tech Mono',monospace}
+.armory-section-count{font-size:var(--font-xxs);font-weight:600;color:var(--text2);font-family:'Share Tech Mono',monospace;background:rgba(0,0,0,0.2);padding:2px 8px;border-radius:4px}
 .stim-tray{display:flex;gap:8px;overflow-x:auto}
+
+/* ─── STIM STRIP (compact consumables) ─── */
+.stim-strip{display:flex;flex-direction:column;gap:var(--space-xs)}
+.stim-chip{display:flex;align-items:center;gap:var(--space-sm);padding:8px var(--space-md);background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:var(--radius-md);transition:all 0.15s;min-height:var(--touch-min)}
+.stim-chip:hover{border-color:var(--stim-color,var(--border))}
+.stim-chip-icon{font-size:18px;width:28px;text-align:center;flex-shrink:0}
+.stim-chip-info{flex:1;min-width:0}
+.stim-chip-name{font-size:var(--font-xs);font-weight:700;color:var(--stim-color,var(--text));font-family:'Share Tech Mono',monospace;display:block}
+.stim-chip-desc{font-size:var(--font-xxs);color:var(--text2);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stim-chip-count{font-size:var(--font-xs);font-weight:700;color:var(--text);font-family:'Share Tech Mono',monospace;background:var(--bg3);padding:2px 8px;border-radius:4px;flex-shrink:0}
+.stim-chip-buy{font-size:var(--font-xxs);font-weight:700;color:var(--warning);background:none;border:1px solid var(--border);border-radius:4px;padding:3px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace;flex-shrink:0;transition:all 0.15s}
+.stim-chip-buy:hover:not(:disabled){border-color:var(--warning);background:rgba(255,165,2,0.08)}
+.stim-chip-buy:disabled{opacity:0.3;cursor:default}
+.stim-chip-use{font-size:var(--font-xxs);font-weight:700;color:var(--bg);background:var(--stim-color,var(--accent));border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-family:'Share Tech Mono',monospace;flex-shrink:0;letter-spacing:0.5px;transition:all 0.15s}
+.stim-chip-use:hover{filter:brightness(1.2)}
 .stim-card{flex:1;min-width:72px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px 8px;border-radius:var(--radius-md);background:var(--bg2);border:1px solid var(--stim-color,var(--border));position:relative;transition:all .15s}
 .stim-icon-bg{width:36px;height:36px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--stim-color) 20%,transparent),transparent);display:flex;align-items:center;justify-content:center}
 .stim-icon{font-size:18px}
@@ -146,8 +162,8 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 .filter-pill{display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text2);font-family:'Chakra Petch',sans-serif;font-size:var(--font-xxs);font-weight:700;cursor:pointer;transition:all .15s}
 .filter-pill.filter-active{background:var(--accent);border-color:var(--accent);color:var(--bg)}
 .filter-count{font-size:9px;opacity:0.6}
-.gear-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-.gear-card{border-radius:var(--radius-md);background:var(--bg2);border:1px solid var(--rarity-color,var(--border));overflow:hidden;transition:all .15s;animation:fadeSlideUp 0.3s ease both}
+.gear-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-sm)}
+.gear-card{border-radius:var(--radius-lg);background:var(--bg2);border:1px solid var(--rarity-color,var(--border));overflow:hidden;transition:all .2s;animation:fadeSlideUp 0.3s ease both}
 .gear-card:hover{box-shadow:0 0 12px color-mix(in srgb,var(--rarity-color) 20%,transparent)}
 .gear-rarity-bar{height:3px;background:var(--rarity-color);opacity:0.7}
 .gear-card-body{padding:8px 10px;display:flex;flex-direction:column;gap:3px}
@@ -164,12 +180,23 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 .gear-equipped{font-size:8px;font-weight:500;color:var(--accent);background:rgba(var(--glow-accent),0.1);padding:2px 5px;border-radius:3px}
 .gear-scrap{font-size:9px;font-weight:500;color:var(--warning);background:none;border:none;cursor:pointer;font-family:'Share Tech Mono',monospace;padding:0}
 
+/* ─── CHAPTER TABS ─── */
+.chapter-tabs{display:flex;gap:var(--space-xs);overflow-x:auto;padding-bottom:var(--space-sm);margin-bottom:var(--space-md);border-bottom:1px solid var(--border);flex-shrink:0}
+.chapter-tab{flex-shrink:0;padding:var(--space-sm) var(--space-md);background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text2);font-family:'Chakra Petch',sans-serif;font-size:var(--font-xs);font-weight:600;cursor:pointer;transition:all 0.15s;min-height:var(--touch-min);text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.chapter-tab.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,0.08)}
+.chapter-tab.chapter-done{border-color:var(--success);color:var(--success)}
+.chapter-tab.chapter-done.active{background:rgba(46,213,115,0.08)}
+.chapter-tab.chapter-locked{opacity:0.4;cursor:not-allowed}
+.chapter-tab .ch-progress{font-family:'Share Tech Mono',monospace;font-size:var(--font-xxs);opacity:0.7}
+.mission-grid{display:grid;grid-template-columns:1fr;gap:var(--space-sm)}
+.mission-grid .mission-card{margin:0}
+
 /* ─── MISSIONS ─── */
-.mission-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:var(--space-md);margin:var(--space-sm) 0;cursor:pointer;transition:all .15s;animation:fadeSlideUp 0.3s ease both}
+.mission-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-lg);margin:0;cursor:pointer;transition:all .2s;animation:fadeSlideUp 0.3s ease both;position:relative}
 .mission-card:nth-child(2){animation-delay:0.05s}.mission-card:nth-child(3){animation-delay:0.1s}.mission-card:nth-child(4){animation-delay:0.15s}
-.mission-card:hover{border-color:var(--accent);box-shadow:0 0 15px rgba(var(--glow-accent),0.1);transform:translateX(2px)}.mission-card h4{color:var(--text);font-size:var(--font-sm);margin-bottom:var(--space-xs)}
-.mission-card .mission-desc{color:var(--text2);font-size:var(--font-xs);margin-bottom:var(--space-sm)}
-.mission-card .mission-meta{display:flex;gap:var(--space-md);font-size:var(--font-xxs);color:var(--text2);flex-wrap:wrap}.mission-card .mission-meta span{font-family:'Share Tech Mono',monospace}
+.mission-card:hover{border-color:var(--accent);box-shadow:0 0 16px rgba(var(--glow-accent),0.1);transform:translateY(-1px)}.mission-card h4{color:var(--text);font-size:var(--font-sm);margin-bottom:var(--space-xs)}
+.mission-card .mission-desc{color:var(--text2);font-size:var(--font-xs);margin-bottom:var(--space-sm);line-height:1.4}
+.mission-card .mission-meta{display:flex;gap:var(--space-sm);font-size:var(--font-xxs);color:var(--text2);flex-wrap:wrap;padding-top:var(--space-sm);border-top:1px solid var(--border)}.mission-card .mission-meta span{font-family:'Share Tech Mono',monospace;background:rgba(0,0,0,0.2);padding:2px 6px;border-radius:3px}
 
 /* ─── MODALS ─── */
 .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);display:flex;align-items:flex-end;justify-content:center;z-index:100;padding:0;animation:fadeIn 0.2s ease}
@@ -264,6 +291,16 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 
 /* ─── COMMS ─── */
 .comms-tab{display:flex;flex-direction:column;gap:12px}
+.comms-sidebar{display:flex;flex-direction:column;gap:var(--space-xs)}
+.comms-sidebar-item{padding:var(--space-md) var(--space-lg);background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:10px}
+.comms-sidebar-item:hover{border-color:var(--accent)}
+.comms-sidebar-item.comms-sidebar-active{border-color:var(--accent);background:rgba(0,212,255,0.06)}
+.comms-sidebar-item.comms-sidebar-done{border-color:rgba(46,213,115,0.3)}
+.comms-sidebar-item.comms-sidebar-locked{opacity:0.4;cursor:not-allowed}
+.comms-sidebar-ch{font-size:var(--font-xxs);font-weight:700;color:var(--accent);font-family:'Share Tech Mono',monospace;flex-shrink:0}
+.comms-sidebar-title{font-size:var(--font-xs);font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.comms-sidebar-status{font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;font-family:'Share Tech Mono',monospace;letter-spacing:0.5px}
+.comms-content{min-height:0;overflow-y:auto}
 .comms-doc{background:var(--bg2);border:1px solid var(--doc-color,var(--border));border-radius:var(--radius-md);padding:var(--space-lg);animation:fadeSlideUp 0.3s ease both}
 .comms-doc.comms-locked{opacity:0.45}
 .comms-doc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-sm)}
@@ -282,14 +319,46 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 .comms-hint{text-align:center;padding:var(--space-md);color:var(--text2);font-size:var(--font-xxs);border:1px dashed var(--border);border-radius:6px;font-family:'Share Tech Mono',monospace}
 
 /* ─── RECRUIT ─── */
-.recruit-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-sm)}
-.recruit-card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:var(--space-md);text-align:center;transition:all 0.2s ease;animation:fadeSlideUp 0.3s ease both}
+.recruit-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md)}
+.recruit-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-lg);text-align:center;transition:all 0.2s ease;animation:fadeSlideUp 0.3s ease both;display:flex;flex-direction:column}
 .recruit-card:nth-child(2){animation-delay:0.05s}.recruit-card:nth-child(3){animation-delay:0.1s}.recruit-card:nth-child(4){animation-delay:0.15s}
-.recruit-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 15px rgba(var(--glow-accent),0.1)}
-.recruit-card .class-icon{font-size:28px}.recruit-card h4{font-size:var(--font-sm);margin:var(--space-xs) 0}.recruit-card p{font-size:var(--font-xs);color:var(--text2);line-height:1.3}
+.recruit-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 20px rgba(var(--glow-accent),0.12)}
+.recruit-card .class-icon{font-size:36px;margin-bottom:var(--space-xs);display:block}.recruit-card h4{font-size:var(--font-sm);margin:var(--space-xs) 0}.recruit-card p{font-size:var(--font-xs);color:var(--text2);line-height:1.4;flex:1}
 .empty-state{text-align:center;padding:32px var(--space-lg);color:var(--text2)}.empty-state .big-icon{font-size:40px;margin-bottom:var(--space-sm)}
 
-/* ─── SQUAD CARD STATS ─── */
+/* ─── SQUAD LAYOUT ─── */
+.squad-card-grid{display:grid;grid-template-columns:1fr;gap:var(--space-md)}
+.squad-detail-left,.squad-detail-right{min-height:0}
+
+/* ─── OPERATIVE CARD (list view) ─── */
+.op-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-lg);cursor:pointer;transition:all 0.2s ease;animation:fadeSlideUp 0.3s ease both;position:relative;overflow:hidden}
+.op-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--op-color,var(--accent));opacity:0.6}
+.op-card:hover{border-color:var(--op-color,var(--accent));box-shadow:0 0 16px rgba(var(--glow-accent),0.1),inset 0 0 20px rgba(var(--glow-accent),0.03);transform:translateY(-1px)}
+.op-card:nth-child(2){animation-delay:0.05s}.op-card:nth-child(3){animation-delay:0.1s}.op-card:nth-child(4){animation-delay:0.15s}
+.op-card-top{display:flex;gap:var(--space-md);align-items:flex-start;margin-bottom:var(--space-md)}
+.op-card-portrait{width:56px;height:56px;border-radius:var(--radius-md);background:rgba(0,0,0,0.35);border:1px solid var(--op-color,var(--accent));display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;box-shadow:0 0 12px color-mix(in srgb,var(--op-color,var(--accent)) 20%,transparent)}
+.op-card-icon{font-size:28px}
+.op-card-level{position:absolute;bottom:-4px;right:-4px;font-size:9px;font-family:'Share Tech Mono',monospace;font-weight:700;color:var(--bg);background:var(--op-color,var(--accent));padding:1px 5px;border-radius:4px;letter-spacing:0.5px}
+.op-card-identity{flex:1;min-width:0}
+.op-card-name{font-size:var(--font-body);font-weight:700;color:var(--op-color,var(--text));margin:0;line-height:1.2}
+.op-card-class{font-size:var(--font-xxs);font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.op-card-traits{display:flex;gap:3px;margin-top:4px;flex-wrap:wrap}
+.op-card-sp{font-size:var(--font-xxs);font-family:'Share Tech Mono',monospace;color:var(--warning);margin-top:4px;font-weight:700}
+.op-card-hp{margin-bottom:var(--space-sm)}
+.op-card-hp-label{display:flex;justify-content:space-between;font-size:var(--font-xxs);font-family:'Share Tech Mono',monospace;color:var(--text2);margin-bottom:3px;font-weight:600}
+.op-card-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.op-stat{display:flex;flex-direction:column;align-items:center;gap:1px;padding:8px 4px;background:rgba(0,0,0,0.25);border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,0.03)}
+.op-stat-val{font-size:var(--font-sm);font-weight:700;color:var(--text);font-family:'Share Tech Mono',monospace;line-height:1}
+.op-stat-label{font-size:8px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;line-height:1}
+
+/* ─── OPERATIVE DETAIL HEADER ─── */
+.op-detail-header{display:flex;gap:var(--space-lg);align-items:flex-start;margin-bottom:var(--space-md);padding-bottom:var(--space-md);border-bottom:1px solid var(--border)}
+.op-detail-portrait{width:72px;height:72px;border-radius:var(--radius-lg);background:rgba(0,0,0,0.4);border:2px solid var(--op-color,var(--accent));display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 20px color-mix(in srgb,var(--op-color,var(--accent)) 25%,transparent)}
+.op-detail-icon{font-size:36px}
+.op-detail-identity{flex:1;min-width:0}
+.op-detail-xp{margin-bottom:var(--space-md)}
+
+/* ─── SQUAD CARD STATS (legacy) ─── */
 .squad-stats{display:flex;gap:var(--space-md);font-size:var(--font-xs);color:var(--text2);margin-top:var(--space-xs);flex-wrap:wrap}
 .squad-stats .stat-item{display:flex;align-items:center;gap:3px}
 .squad-stats .stat-label{color:var(--text2);font-size:var(--font-xxs);text-transform:uppercase}
@@ -373,9 +442,13 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
   .turn-icon.turn-active{width:38px;height:50px;font-size:16px}
 }
 
+/* ─── PANEL LAYOUTS ─── */
+.split-panel{display:grid;grid-template-columns:1fr;gap:var(--space-md);min-height:0}
+.split-panel-sidebar{display:grid;grid-template-columns:1fr;gap:var(--space-md);min-height:0}
+
 /* ─── TABLET IMPROVEMENTS ─── */
 @media(min-width:481px){
-  .content{max-width:600px;margin:0 auto;width:100%}
+  .content{max-width:900px;margin:0 auto;width:100%}
   .modal-overlay{align-items:center;padding:var(--space-lg)}
   .modal{border-radius:12px;animation:flickerIn 0.3s ease}
 }
@@ -558,7 +631,14 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 /* ─── DESKTOP ─── */
 @media(min-width:900px){
   :root{--font-body:18px;--font-sm:15px;--font-xs:13px;--font-xxs:11px;--font-lg:24px;--font-xl:32px}
-  .content{max-width:800px}
+  .content{max-width:1200px}
+  .split-panel{grid-template-columns:1fr 1fr}
+  .split-panel-sidebar{grid-template-columns:260px 1fr}
+  .squad-card-grid{grid-template-columns:repeat(2,1fr)}
+  .mission-grid{grid-template-columns:repeat(2,1fr)}
+  .gear-grid{grid-template-columns:repeat(3,1fr)}
+  .recruit-grid{grid-template-columns:repeat(3,1fr)}
+  .stim-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--space-xs)}
   .unit-tile{width:120px;min-height:120px}
   .unit-tile-icon{font-size:32px}
   .unit-tile-name{font-size:var(--font-xs)}
@@ -589,4 +669,11 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
   .ability-item{padding:7px 10px}
   .ability-name{font-size:var(--font-xxs)}
   .ability-desc{font-size:var(--font-xxs)}
+}
+
+/* ─── LARGE DESKTOP ─── */
+@media(min-width:1100px){
+  .squad-card-grid{grid-template-columns:repeat(3,1fr)}
+  .gear-grid{grid-template-columns:repeat(4,1fr)}
+  .recruit-grid{grid-template-columns:repeat(4,1fr)}
 }

@@ -152,7 +152,7 @@ describe('InventoryTab', () => {
     const { container } = render(
       <InventoryTab game={game} invFilter="all" setInvFilter={vi.fn()} stimTarget={null} setStimTarget={vi.fn()} buyStim={vi.fn()} useStim={vi.fn()} scrapGear={vi.fn()} />
     );
-    expect(container.textContent).toContain('COMBAT STIMS');
+    expect(container.textContent).toContain('CONSUMABLES');
     expect(container.textContent).toContain('GEAR LOCKER');
     expect(container.textContent).toContain('2 ITEMS');
   });
