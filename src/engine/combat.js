@@ -400,8 +400,7 @@ export function executeEnemyTurn(enemyId, squad, enemies) {
   const targets = s.filter(o => o.alive);
   if (targets.length === 0) return { squad: s, enemies: e, log };
 
-  const taunters = targets.filter(o => getBuffModifiedStats(o, true).taunt);
-  const target = taunters.length > 0 && Math.random() > 0.3 ? pick(taunters) : pick(targets);
+  const target = selectEnemyTarget(enemy, targets, e.filter(x => x.alive));
   const stats = getBuffModifiedStats(target, true);
 
   // Evasion check (includes Smoke Bomb evasion buff)
@@ -416,6 +415,12 @@ export function executeEnemyTurn(enemyId, squad, enemies) {
   }
 
   let dmg = enemy.damage + rng(-2, 3);
+
+  // Boss phase damage modifier
+  const bossPhase = getBossPhaseModifiers(enemy);
+  if (bossPhase) {
+    dmg = Math.round(dmg * bossPhase.damageModifier);
+  }
 
   // Shield redirect
   if (stats.shieldRedirect && target.currentShield > 0) {
@@ -442,6 +447,87 @@ export function executeEnemyTurn(enemyId, squad, enemies) {
   log.push({ text: `  ${enemy.name} ▸ ${target.icon}${target.name.split(" ")[0]} ${dmg}${killed ? " ☠DOWN" : ""}${target.defending ? " (guarding)" : ""}`, type: killed ? "allyDown" : "enemy" });
 
   return { squad: s, enemies: e, log };
+}
+
+/**
+ * Select a target operative from aliveAllies based on the enemy's aiProfile.
+ * Pure function — no side effects.
+ *
+ * @param {object} enemy        - The attacking enemy (has .aiProfile string)
+ * @param {array}  aliveAllies  - Operatives with .alive === true
+ * @param {array}  aliveEnemies - All alive enemies (available for future use)
+ * @returns {object} One operative from aliveAllies
+ */
+export function selectEnemyTarget(enemy, aliveAllies, aliveEnemies) {
+  // Edge case: only one ally left — return immediately regardless of profile
+  if (aliveAllies.length === 1) return aliveAllies[0];
+
+  const profile = enemy.aiProfile || 'default';
+
+  // --- Taunt check (shared by all profiles) ---
+  const taunters = aliveAllies.filter(o => getBuffModifiedStats(o, true).taunt);
+  const hasTaunters = taunters.length > 0;
+
+  // aggro: 70% chance to respect taunt, picks lowest HP taunter (not random)
+  if (profile === 'aggro') {
+    if (hasTaunters && Math.random() <= 0.7) {
+      return taunters.reduce((lowest, o) => o.currentHp < lowest.currentHp ? o : lowest, taunters[0]);
+    }
+    // 30% taunt ignored (or no taunters): lowest HP among all allies
+    return aliveAllies.reduce((lowest, o) => o.currentHp < lowest.currentHp ? o : lowest, aliveAllies[0]);
+  }
+
+  // tactical: highest damage ally; prefer non-defending target
+  if (profile === 'tactical') {
+    if (hasTaunters && Math.random() <= 0.7) {
+      return pick(taunters);
+    }
+    const byDamage = [...aliveAllies].sort(
+      (a, b) => getBuffModifiedStats(b, true).damage - getBuffModifiedStats(a, true).damage
+    );
+    const nonDefending = byDamage.filter(o => !o.defending);
+    return nonDefending.length > 0 ? nonDefending[0] : byDamage[0];
+  }
+
+  // support: Medics first, then lowest armor
+  if (profile === 'support') {
+    if (hasTaunters && Math.random() <= 0.7) {
+      return pick(taunters);
+    }
+    const medics = aliveAllies.filter(o => o.className === 'Medic');
+    if (medics.length > 0) return pick(medics);
+    return aliveAllies.reduce((lowest, o) => {
+      const armorA = getBuffModifiedStats(o, true).armor || 0;
+      const armorL = getBuffModifiedStats(lowest, true).armor || 0;
+      return armorA < armorL ? o : lowest;
+    }, aliveAllies[0]);
+  }
+
+  // tank: random target (respects taunt normally)
+  if (profile === 'tank') {
+    if (hasTaunters && Math.random() <= 0.7) {
+      return pick(taunters);
+    }
+    return pick(aliveAllies);
+  }
+
+  // assassin: lowest effective armor
+  if (profile === 'assassin') {
+    if (hasTaunters && Math.random() <= 0.7) {
+      return pick(taunters);
+    }
+    return aliveAllies.reduce((lowest, o) => {
+      const armorA = getBuffModifiedStats(o, true).armor || 0;
+      const armorL = getBuffModifiedStats(lowest, true).armor || 0;
+      return armorA < armorL ? o : lowest;
+    }, aliveAllies[0]);
+  }
+
+  // default / unknown profile: random with normal taunt respect
+  if (hasTaunters && Math.random() <= 0.7) {
+    return pick(taunters);
+  }
+  return pick(aliveAllies);
 }
 
 /**
@@ -894,4 +980,38 @@ export function tickEnemyCooldowns(enemy) {
   for (const key of Object.keys(enemy.abilityCooldowns)) {
     enemy.abilityCooldowns[key] = Math.max(0, enemy.abilityCooldowns[key] - 1);
   }
+}
+
+/**
+ * Returns the current boss phase info for an enemy based on its HP percentage.
+ * Returns null for non-boss enemies (those without a bossPhases array).
+ *
+ * bossPhases is expected to be sorted by hpThreshold descending, e.g.:
+ *   [{ hpThreshold: 1.0, name: 'normal' }, { hpThreshold: 0.5, name: 'enraged', damageModifier: 1.3 }, ...]
+ *
+ * The function iterates all phases and keeps updating currentPhase for each phase
+ * where hpPercent <= threshold. Since phases are sorted descending, the last match
+ * is the lowest applicable threshold (most severe phase).
+ *
+ * @param {object} enemy - enemy instance with hp, maxHp, and optionally bossPhases
+ * @returns {{ phase: string, damageModifier: number } | null}
+ */
+export function getBossPhaseModifiers(enemy) {
+  if (!enemy.bossPhases) return null;
+
+  const hpPercent = enemy.hp / enemy.maxHp;
+
+  // IMPORTANT: bossPhases must be sorted by hpThreshold descending (1.0, 0.5, 0.2).
+  // Iterate all; keep updating for each match so the last (lowest) threshold wins.
+  let currentPhase = enemy.bossPhases[0]; // default: first (normal) phase
+  for (const phase of enemy.bossPhases) {
+    if (hpPercent <= phase.hpThreshold) {
+      currentPhase = phase;
+    }
+  }
+
+  return {
+    phase: currentPhase.name,
+    damageModifier: currentPhase.damageModifier || 1.0,
+  };
 }
