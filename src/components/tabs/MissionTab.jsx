@@ -1,18 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MISSIONS } from '../../data/missions';
 import { STORY_CHAPTERS } from '../../data/story';
 import { ENEMY_TEMPLATES } from '../../data/enemies';
 import { RARITY_NAMES, RARITY_COLORS } from '../../data/constants';
 import BattleScene from '../combat/BattleScene';
+import PhaserGame from '../../phaser/PhaserGame';
 
 export default function MissionTab({
   game, mission, combatLog, decision, missionResult, logRef, turnState,
   banter, storyReactions,
+  mapData, playerPos, eventBridge,
   startMission, advanceMission, handleDecision, resetMission, advanceDebrief,
   selectAttack, selectDefend, selectItem, chooseStim, chooseTarget, cancelSelection,
   selectAbility, chooseAbility, chooseAllyTarget,
 }) {
   const [selectedChapter, setSelectedChapter] = useState(null);
+  const [encounterInfo, setEncounterInfo] = useState(null);
+
+  // Listen for step updates from Phaser to show live encounter info
+  useEffect(() => {
+    if (!eventBridge) return;
+    function onStep(data) {
+      setEncounterInfo(data.encounterState);
+    }
+    function onReady(data) {
+      setEncounterInfo(data.encounterState);
+    }
+    eventBridge.on("map:step", onStep);
+    eventBridge.on("map:ready", onReady);
+    return () => {
+      eventBridge.off("map:step", onStep);
+      eventBridge.off("map:ready", onReady);
+    };
+  }, [eventBridge]);
 
   if (!mission) {
     const avg = game.squad.length>0?Math.round(game.squad.reduce((s,o)=>s+o.level,0)/game.squad.length):1;
@@ -95,29 +115,54 @@ export default function MissionTab({
     </div>);
   }
 
+  const isExploring = mission.phase === "exploration";
+  const isCombat = mission.phase === "combat";
+  const showMap = isExploring || isCombat; // Keep Phaser alive during combat (hidden)
+
   return (<div className="mission-layout">
-    <BattleScene
-      squad={game.squad}
-      enemies={mission.enemies}
-      turnState={turnState}
-      currentEncounter={mission.currentEncounter}
-      totalEncounters={mission.totalEncounters}
-      roundNum={mission.roundNum}
-      combatLog={combatLog}
-      logRef={logRef}
-      missionTypeName={mission.type.name}
-      environment={mission.environment}
-      stims={game.stims}
-      selectAttack={selectAttack}
-      selectDefend={selectDefend}
-      selectItem={selectItem}
-      chooseStim={chooseStim}
-      chooseTarget={chooseTarget}
-      cancelSelection={cancelSelection}
-      selectAbility={selectAbility}
-      chooseAbility={chooseAbility}
-      chooseAllyTarget={chooseAllyTarget}
-    />
+    {/* Exploration map — visible during exploration, hidden (but alive) during combat */}
+    {showMap && mapData && (
+      <div style={{ display: isExploring ? "block" : "none" }}>
+        <PhaserGame
+          mapData={mapData}
+          eventBridge={eventBridge}
+          active={isExploring}
+          playerPos={playerPos}
+        />
+        {isExploring && (
+          <div style={{ textAlign: "center", padding: "8px 0", fontSize: "var(--font-xs)", color: "var(--text2)", fontFamily: "'Share Tech Mono', monospace" }}>
+            WASD / Arrow keys to move · Encounters: {encounterInfo ? `${encounterInfo.triggered}/${encounterInfo.total}` : `0/${mission.totalEncounters}`}
+            {encounterInfo && encounterInfo.remaining <= 0 && <span style={{ color: "var(--warning)", marginLeft: 8 }}>▸ Find the exit</span>}
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* Battle scene — only during active combat */}
+    {isCombat && (
+      <BattleScene
+        squad={game.squad}
+        enemies={mission.enemies}
+        turnState={turnState}
+        currentEncounter={mission.currentEncounter}
+        totalEncounters={mission.totalEncounters}
+        roundNum={mission.roundNum}
+        combatLog={combatLog}
+        logRef={logRef}
+        missionTypeName={mission.type.name}
+        environment={mission.environment}
+        stims={game.stims}
+        selectAttack={selectAttack}
+        selectDefend={selectDefend}
+        selectItem={selectItem}
+        chooseStim={chooseStim}
+        chooseTarget={chooseTarget}
+        cancelSelection={cancelSelection}
+        selectAbility={selectAbility}
+        chooseAbility={chooseAbility}
+        chooseAllyTarget={chooseAllyTarget}
+      />
+    )}
     <div className="sticky-bar">
       {decision&&mission.phase==="decision"&&(
         <div className="decision-panel">

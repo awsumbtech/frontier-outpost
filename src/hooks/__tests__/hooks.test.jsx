@@ -182,14 +182,14 @@ describe('useMission', () => {
     expect(typeof missionHook.result.current.advanceDebrief).toBe('function');
   });
 
-  it('advanceMission transitions from briefing to combat', () => {
+  it('advanceMission transitions from briefing to exploration', () => {
     const { missionHook } = setup();
     const mt = MISSIONS[0];
     act(() => { missionHook.result.current.startMission(mt); });
     act(() => { missionHook.result.current.advanceMission(); });
-    expect(missionHook.result.current.mission.phase).toBe('combat');
-    expect(missionHook.result.current.mission.enemies.length).toBeGreaterThan(0);
-    expect(missionHook.result.current.mission.currentEncounter).toBe(1);
+    expect(missionHook.result.current.mission.phase).toBe('exploration');
+    expect(missionHook.result.current.mapData).not.toBeNull();
+    expect(missionHook.result.current.mapData.terrain.length).toBeGreaterThan(0);
   });
 
   it('resetMission clears all mission state', () => {

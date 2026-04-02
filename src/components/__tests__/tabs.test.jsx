@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+
+// Mock PhaserGame to avoid Phaser canvas detection crashing in jsdom
+vi.mock('../../phaser/PhaserGame', () => ({
+  default: () => null,
+}));
+
 import SquadTab from '../tabs/SquadTab';
 import MissionTab from '../tabs/MissionTab';
 import InventoryTab from '../tabs/InventoryTab';

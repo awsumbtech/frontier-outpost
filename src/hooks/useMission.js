@@ -25,6 +25,8 @@ import {
 } from "../engine/combat";
 import { getEnvironmentForMission } from "../engine/environments";
 import { selectBark, selectBanter, getInlineStory, getDecisionEcho, getEnvFlavor, selectStoryReaction, selectDeathReaction } from "../engine/personality";
+import { generateMapForMission } from "../engine/mapgen";
+import EventBridge from "../phaser/EventBridge";
 
 export default function useMission(game, setGame, updateGame, setTab) {
   const [mission, setMission] = useState(null);
@@ -34,10 +36,13 @@ export default function useMission(game, setGame, updateGame, setTab) {
   const [turnState, setTurnState] = useState(null);
   const [banter, setBanter] = useState(null);
   const [storyReactions, setStoryReactions] = useState([]);
+  const [mapData, setMapData] = useState(null);
+  const [playerPos, setPlayerPos] = useState(null);
   const logRef = useRef(null);
   const recentBarksRef = useRef([]);
   const barkBudgetRef = useRef(2);
   const enemyTimerRef = useRef(null);
+  const eventBridgeRef = useRef(new EventBridge());
 
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [combatLog]);
 
@@ -45,6 +50,75 @@ export default function useMission(game, setGame, updateGame, setTab) {
   useEffect(() => {
     return () => { if (enemyTimerRef.current) clearTimeout(enemyTimerRef.current); };
   }, []);
+
+  // ── Exploration Map Event Listeners ──
+  useEffect(() => {
+    const bridge = eventBridgeRef.current;
+
+    function onMapEncounter(data) {
+      // Save player position for return after combat
+      setPlayerPos(data.position);
+
+      // Generate enemies for this encounter
+      setMission(m => {
+        if (!m) return m;
+        const ne = m.currentEncounter + 1;
+        const enemies = generateEncounter(m.type.tier, ne - 1);
+
+        barkBudgetRef.current = 2;
+        recentBarksRef.current = [];
+        const envFlavor = getEnvFlavor(m.environment?.id);
+        const flavorEntry = envFlavor ? [{ text: envFlavor, type: "flavor" }] : [];
+        setCombatLog(p => [...p, ...flavorEntry, { text: `Encounter ${ne}/${m.totalEncounters}`, type: "round" }, { text: enemies.map(e => e.name).join(", "), type: "info" }]);
+
+        const newMission = { ...m, phase: "combat", enemies, currentEncounter: ne, roundNum: 0 };
+
+        // Start the first round after a brief delay
+        const currentSquad = game.squad.map(o => ({ ...o }));
+        setTimeout(() => startRound(newMission, currentSquad, 0), 400);
+
+        return newMission;
+      });
+    }
+
+    function onMapExit(data) {
+      // All encounters done, player reached exit — trigger mission result
+      setMission(m => {
+        if (!m) return m;
+        // Mission complete — calculate rewards
+        const tm = m.type.tier;
+        const loot = Array.from({ length: rng(1, 2 + tm) }, () => generateGear(pick(["weapon","armor","implant","gadget"]), pick(CLASS_KEYS), game.squad[0]?.level || 1));
+        const isFirstClear = !game.completedMissions?.[m.type.id];
+        const repeatPenalty = isFirstClear ? 1 : 0.5;
+        const xp = Math.round(50 * m.type.xpMult * tm * repeatPenalty);
+        const creds = Math.round(rng(30, 60) * tm * repeatPenalty);
+        const prevMC = m.prevMissionsCompleted;
+        const newMC = prevMC + (isFirstClear ? 1 : 0);
+        const newBeats = STORY_CHAPTERS.flatMap(ch => ch.beats.filter(b => b.at > prevMC && b.at <= newMC).map(b => ({ ...b, chapterId: ch.id })));
+
+        setCombatLog(p => [...p, { text: "MISSION COMPLETE", type: "header" }, { text: `+${xp}XP +${creds}¢ ${loot.length} items${!isFirstClear ? " (repeat)" : " ★FIRST CLEAR"}`, type: "info" }]);
+        setMissionResult({ success: true, loot, xp, credits: creds, combatStats: m.combatStats, newBeats });
+
+        updateGame(g => {
+          const wasFirstClear = !g.completedMissions?.[m.type.id];
+          const ng = { ...g, inventory: [...g.inventory, ...loot], credits: g.credits + creds, missionsCompleted: g.missionsCompleted + (wasFirstClear ? 1 : 0), completedMissions: { ...(g.completedMissions || {}), [m.type.id]: (g.completedMissions?.[m.type.id] || 0) + 1 } };
+          ng.squad = ng.squad.map(o => { if (!o.alive) return o; let nx = o.xp + xp, lv = o.level, sp = o.skillPoints, xn = xpForLevel(lv);
+            while (nx >= xn) { nx -= xn; lv++; sp++; xn = xpForLevel(lv); } return { ...o, xp: nx, level: lv, skillPoints: sp, xpToLevel: xn }; });
+          return ng;
+        });
+
+        return { ...m, phase: "result", debriefPhase: "stats" };
+      });
+    }
+
+    bridge.on("map:encounter", onMapEncounter);
+    bridge.on("map:exit", onMapExit);
+
+    return () => {
+      bridge.off("map:encounter", onMapEncounter);
+      bridge.off("map:exit", onMapExit);
+    };
+  });
 
   function betweenEncounterHeal() {
     setGame(prev => ({
@@ -480,61 +554,29 @@ export default function useMission(game, setGame, updateGame, setTab) {
       setMissionResult({ success: false, combatStats: mission?.combatStats || {}, newBeats: [] });
 
     } else if (endResult === "allEnemiesDead") {
-      // Encounter complete — compute everything OUTSIDE setMission callback to avoid StrictMode double-fire
+      // Encounter complete — return to exploration map
       const m = mission;
       if (!m) return;
-      const ne = m.currentEncounter + 1;
 
-      if (ne > m.totalEncounters) {
-        // Mission complete
-        const tm = m.type.tier;
-        const loot = Array.from({ length: rng(1, 2 + tm) }, () => generateGear(pick(["weapon","armor","implant","gadget"]), pick(CLASS_KEYS), game.squad[0]?.level || 1));
-        const isFirstClear = !game.completedMissions?.[m.type.id];
-        const repeatPenalty = isFirstClear ? 1 : 0.5;
-        const xp = Math.round(50 * m.type.xpMult * tm * repeatPenalty);
-        const creds = Math.round(rng(30, 60) * tm * repeatPenalty);
-        const prevMC = m.prevMissionsCompleted;
-        const newMC = prevMC + (isFirstClear ? 1 : 0);
-        const newBeats = STORY_CHAPTERS.flatMap(ch => ch.beats.filter(b => b.at > prevMC && b.at <= newMC).map(b => ({ ...b, chapterId: ch.id })));
+      // Between-encounter healing and story
+      betweenEncounterHeal();
+      const betweenStory = getInlineStory(m.type.id, 'betweenEncounter', m.currentEncounter);
+      const storyLog = betweenStory.map(s => ({ text: `${s.sender}: ${s.text}`, type: "story" }));
+      setCombatLog(p => [...p, ...storyLog, { text: `💚 Squad recovers between encounters`, type: "heal" }]);
 
-        setCombatLog(p => [...p, { text: "MISSION COMPLETE", type: "header" }, { text: `+${xp}XP +${creds}¢ ${loot.length} items${!isFirstClear ? " (repeat)" : " ★FIRST CLEAR"}`, type: "info" }]);
-        setMissionResult({ success: true, loot, xp, credits: creds, combatStats: m.combatStats, newBeats });
-        setMission(prev => prev ? { ...prev, phase: "result", debriefPhase: "stats" } : prev);
-
-        updateGame(g => {
-          const wasFirstClear = !g.completedMissions?.[m.type.id];
-          const ng = { ...g, inventory: [...g.inventory, ...loot], credits: g.credits + creds, missionsCompleted: g.missionsCompleted + (wasFirstClear ? 1 : 0), completedMissions: { ...(g.completedMissions || {}), [m.type.id]: (g.completedMissions?.[m.type.id] || 0) + 1 } };
-          ng.squad = ng.squad.map(o => { if (!o.alive) return o; let nx = o.xp + xp, lv = o.level, sp = o.skillPoints, xn = xpForLevel(lv);
-            while (nx >= xn) { nx -= xn; lv++; sp++; xn = xpForLevel(lv); } return { ...o, xp: nx, level: lv, skillPoints: sp, xpToLevel: xn }; });
-          return ng;
-        });
+      // 60% chance of a decision event before returning to map
+      if (Math.random() > 0.4) {
+        const evt = pick(DECISION_EVENTS);
+        setCombatLog(p => [...p, { text: `⟐ ${evt.title}`, type: "decision" }]);
+        setDecision(evt);
+        const banterResult = selectBanter(game.squad.filter(o => o.alive));
+        setBanter(banterResult);
+        setMission(prev => prev ? { ...prev, phase: "decision", roundNum: 0, combatStats: prev.combatStats } : prev);
       } else {
-        // More encounters — decision event or next encounter
-        if (Math.random() > 0.4) {
-          const evt = pick(DECISION_EVENTS);
-          setCombatLog(p => [...p, { text: `⟐ ${evt.title}`, type: "decision" }]);
-          setDecision(evt);
-          betweenEncounterHeal();
-          const banterResult = selectBanter(game.squad.filter(o => o.alive));
-          setBanter(banterResult);
-          setMission(prev => prev ? { ...prev, phase: "decision", roundNum: 0, combatStats: prev.combatStats } : prev);
-        } else {
-          const newE = generateEncounter(m.type.tier, ne - 1);
-          const betweenStory = getInlineStory(m.type.id, 'betweenEncounter', m.currentEncounter);
-          const storyLog = betweenStory.map(s => ({ text: `${s.sender}: ${s.text}`, type: "story" }));
-          const envFlavor2 = getEnvFlavor(m.environment?.id);
-          const flavorLog = envFlavor2 ? [{ text: envFlavor2, type: "flavor" }] : [];
-          setCombatLog(p => [...p, ...storyLog, ...flavorLog, { text: `💚 Squad recovers between encounters`, type: "heal" }, { text: `Encounter ${ne}/${m.totalEncounters}`, type: "round" }, { text: newE.map(en => en.name).join(", "), type: "info" }]);
-          betweenEncounterHeal();
-          barkBudgetRef.current = 2; recentBarksRef.current = [];
-          const banterResult = selectBanter(game.squad.filter(o => o.alive));
-          setBanter(banterResult);
-
-          // Start new encounter's first round after a brief delay
-          const newMission = { ...m, enemies: newE, currentEncounter: ne, roundNum: 0, decisionApplied: {}, combatStats: m.combatStats };
-          setMission(newMission);
-          setTimeout(() => startRound(newMission, finalSquad, 0), 500);
-        }
+        // Return to exploration map immediately
+        barkBudgetRef.current = 2; recentBarksRef.current = [];
+        setMission(prev => prev ? { ...prev, phase: "exploration", enemies: [], roundNum: 0, decisionApplied: {} } : prev);
+        eventBridgeRef.current.emit("map:resume", { squad: finalSquad });
       }
     }
   }
@@ -577,7 +619,14 @@ export default function useMission(game, setGame, updateGame, setTab) {
     if (game.squad.filter(o => o.alive).length === 0) return;
     updateGame(g => ({ ...g, squad: g.squad.map(o => { const s = getEffectiveStats(o); return { ...o, alive: true, currentHp: s.hp, currentShield: s.shield, defending: false, currentResource: CLASS_BASE_RESOURCE[o.classKey], activeEffects: [] }; }) }));
     const environment = getEnvironmentForMission(mt.id);
-    setMission({ type: mt, currentEncounter: 0, totalEncounters: mt.encounters, phase: "briefing", enemies: [], roundNum: 0, decisionApplied: {}, combatStats: { totalRounds: 0, enemiesKilled: 0, operativesDowned: 0 }, debriefPhase: null, prevMissionsCompleted: game.missionsCompleted, environment });
+
+    // Generate exploration map
+    const map = generateMapForMission(mt);
+    setMapData(map);
+    const spawnEntity = map.entities.find(e => e.type === "spawn");
+    setPlayerPos(spawnEntity ? { x: spawnEntity.x, y: spawnEntity.y } : null);
+
+    setMission({ type: mt, currentEncounter: 0, totalEncounters: mt.encounters, phase: "briefing", enemies: [], roundNum: 0, decisionApplied: {}, combatStats: { totalRounds: 0, enemiesKilled: 0, operativesDowned: 0 }, debriefPhase: null, prevMissionsCompleted: game.missionsCompleted, environment, mapSeed: map.seed });
     const currentChapter = STORY_CHAPTERS.filter(ch => game.missionsCompleted >= ch.unlockAt).pop();
     const storyFlavor = currentChapter ? [{ text: `[${currentChapter.title}]`, type: "decision" }] : [];
     const inlineStoryEntries = getInlineStory(mt.id, 'preEncounter', 0).map(s => ({ text: `${s.sender}: ${s.text}`, type: "story" }));
@@ -589,18 +638,12 @@ export default function useMission(game, setGame, updateGame, setTab) {
   function advanceMission() {
     if (!mission) return;
     if (mission.phase === "briefing") {
-      const enemies = generateEncounter(mission.type.tier, 0);
-      barkBudgetRef.current = 2; recentBarksRef.current = [];
-      const envFlavor = getEnvFlavor(mission.environment?.id);
-      const flavorEntry = envFlavor ? [{ text: envFlavor, type: "flavor" }] : [];
-      setCombatLog(p => [...p, ...flavorEntry, { text: `Encounter 1/${mission.totalEncounters}`, type: "round" }, { text: enemies.map(e => e.name).join(", "), type: "info" }]);
-
-      const newMission = { ...mission, phase: "combat", enemies, currentEncounter: 1, roundNum: 0 };
+      // Transition to exploration map — encounters trigger via random encounters on the map
+      const newMission = { ...mission, phase: "exploration" };
       setMission(newMission);
 
-      // Start the first round
-      const currentSquad = game.squad.map(o => ({ ...o }));
-      setTimeout(() => startRound(newMission, currentSquad, 0), 200);
+      // Notify Phaser to start the map
+      eventBridgeRef.current.emit("map:start", { mapData, playerPos });
       return;
     }
   }
@@ -608,29 +651,25 @@ export default function useMission(game, setGame, updateGame, setTab) {
   function handleDecision(choice) {
     const applied = { [choice.effect]: true };
     if (choice.effect === "shields") setGame(p => ({ ...p, squad: p.squad.map(o => o.alive ? { ...o, currentShield: o.currentShield + 25 } : o) }));
-    if (choice.effect === "pushThrough") { setGame(p => ({ ...p, squad: p.squad.map(o => { if (!o.alive) return o; return { ...o, currentHp: Math.max(1, o.currentHp - Math.round(getEffectiveStats(o).hp * .15)) }; }) })); setMission(m => m ? ({ ...m, currentEncounter: m.currentEncounter + 1 }) : m); }
-    if (choice.effect === "avoid") setMission(m => m ? ({ ...m, currentEncounter: m.currentEncounter + 1 }) : m);
+    if (choice.effect === "pushThrough") { setGame(p => ({ ...p, squad: p.squad.map(o => { if (!o.alive) return o; return { ...o, currentHp: Math.max(1, o.currentHp - Math.round(getEffectiveStats(o).hp * .15)) }; }) })); }
     if (choice.effect === "salvage") { const b = generateGear(pick(["weapon","armor"]), pick(CLASS_KEYS), (game.squad[0]?.level||1)+1); b.rarity = Math.max(RARITY.RARE, b.rarity); updateGame(g => ({ ...g, inventory: [...g.inventory, b] })); }
     setCombatLog(p => [...p, { text: `>> ${choice.text}`, type: "decision" }]);
     updateGame(g => ({ ...g, decisionHistory: { ...(g.decisionHistory || {}), [choice.effect]: mission.type.id } }));
     setDecision(null);
     setBanter(null);
     barkBudgetRef.current = 2; recentBarksRef.current = [];
-    const enemies = generateEncounter(mission.type.tier, mission.currentEncounter);
-    setCombatLog(p => [...p, { text: `Encounter ${mission.currentEncounter}/${mission.totalEncounters}`, type: "round" }, { text: enemies.map(e => e.name).join(", "), type: "info" }]);
 
-    const newMission = { ...mission, phase: "combat", enemies, roundNum: 0, decisionApplied: { ...(mission.decisionApplied || {}), ...applied } };
-    setMission(newMission);
-
-    // Start combat for new encounter
-    const currentSquad = game.squad.map(o => ({ ...o }));
-    setTimeout(() => startRound(newMission, currentSquad, 0), 200);
+    // Return to exploration map after decision
+    setMission(m => m ? { ...m, phase: "exploration", roundNum: 0, decisionApplied: { ...(m.decisionApplied || {}), ...applied } } : m);
+    eventBridgeRef.current.emit("map:resume", { squad: game.squad });
   }
 
   function resetMission() {
     if (enemyTimerRef.current) clearTimeout(enemyTimerRef.current);
     setMission(null); setDecision(null); setMissionResult(null); setCombatLog([]); setTurnState(null);
     setBanter(null); setStoryReactions([]);
+    setMapData(null); setPlayerPos(null);
+    eventBridgeRef.current.removeAll();
     updateGame(g => ({ ...g, squad: g.squad.map(o => { const s = getEffectiveStats(o); return { ...o, alive: true, currentHp: s.hp, currentShield: s.shield, defending: false, currentResource: CLASS_BASE_RESOURCE[o.classKey] || 0, activeEffects: [] }; }) })); setTab("Squad");
   }
 
@@ -675,6 +714,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
     mission, combatLog, decision, missionResult, logRef,
     turnState,
     banter, storyReactions,
+    mapData, playerPos, eventBridge: eventBridgeRef.current,
     startMission, advanceMission, handleDecision, resetMission, advanceDebrief,
     // Turn-based action handlers
     selectAttack, selectDefend, selectItem,
