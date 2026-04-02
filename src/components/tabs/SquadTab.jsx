@@ -3,6 +3,7 @@ import { RARITY_NAMES, RARITY_COLORS } from '../../data/constants';
 import { CLASSES } from '../../data/classes';
 import { getEffectiveStats } from '../../engine/operatives';
 import ClassBadge from '../shared/ClassBadge';
+import SpriteIcon from '../../sprites/SpriteIcon';
 
 export default function SquadTab({ game, selectedOp, setSelectedOp, setGearModal, unequipGear, learnSkill, dismissOp }) {
   const [confirmDismiss, setConfirmDismiss] = useState(null);
@@ -16,7 +17,7 @@ export default function SquadTab({ game, selectedOp, setSelectedOp, setGearModal
           <div className="card" style={{marginBottom:0,'--op-color':op.color}}>
             <div className="op-detail-header">
               <div className="op-detail-portrait">
-                <span className="op-detail-icon">{op.icon}</span>
+                <span className="op-detail-icon"><SpriteIcon spriteId={op.spriteId} size={48} color={op.color} /></span>
               </div>
               <div className="op-detail-identity">
                 <h3 className="op-card-name" style={{fontSize:'var(--font-lg)'}}>{op.name}</h3>
@@ -92,7 +93,7 @@ export default function SquadTab({ game, selectedOp, setSelectedOp, setGearModal
     return (<div className="op-card" key={op.id} onClick={()=>setSelectedOp(op.id)} style={{'--op-color':op.color}}>
       <div className="op-card-top">
         <div className="op-card-portrait">
-          <span className="op-card-icon">{op.icon}</span>
+          <span className="op-card-icon"><SpriteIcon spriteId={op.spriteId} size={36} color={op.color} /></span>
           <span className="op-card-level">L{op.level}</span>
         </div>
         <div className="op-card-identity">

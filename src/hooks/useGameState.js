@@ -101,7 +101,7 @@ export default function useGameState() {
   function dismissOp(opId) {
     updateGame(g => { const op = g.squad.find(o => o.id === opId); if (!op) return g;
       const inv = [...g.inventory]; for (const s of ["weapon","armor","implant","gadget"]) if (op.gear[s]) inv.push(op.gear[s]);
-      const memorial = [...(g.memorial || []), { name: op.name, classKey: op.classKey, icon: op.icon, traits: op.traits || [], reason: 'dismissed' }];
+      const memorial = [...(g.memorial || []), { name: op.name, classKey: op.classKey, icon: op.icon, spriteId: op.spriteId, color: op.color, traits: op.traits || [], reason: 'dismissed' }];
       return { ...g, squad: g.squad.filter(o => o.id !== opId), inventory: inv, memorial }; }); setSelectedOp(null);
   }
 

@@ -1,5 +1,6 @@
 import { getAvailableAbilities } from '../../engine/combat';
 import { CLASS_RESOURCE_NAMES, CLASS_RESOURCE_COLORS, CLASS_BASE_RESOURCE } from '../../data/constants';
+import SpriteIcon from '../../sprites/SpriteIcon';
 
 export default function AbilitySelector({ operative, onChoose, onCancel }) {
   if (!operative) return null;
@@ -14,7 +15,7 @@ export default function AbilitySelector({ operative, onChoose, onCancel }) {
     return (
       <div className="ability-selector">
         <div className="ability-selector-header">
-          <span>{operative.icon} {operative.name.split(" ")[0]}</span>
+          <span><SpriteIcon spriteId={operative.spriteId} size={16} color={operative.color} /> {operative.name.split(" ")[0]}</span>
           <span className="ability-resource" style={{ color: resourceColor }}>
             {resourceName}: {currentResource}
           </span>
@@ -28,7 +29,7 @@ export default function AbilitySelector({ operative, onChoose, onCancel }) {
   return (
     <div className="ability-selector">
       <div className="ability-selector-header">
-        <span>{operative.icon} {operative.name.split(" ")[0]} — Abilities</span>
+        <span><SpriteIcon spriteId={operative.spriteId} size={16} color={operative.color} /> {operative.name.split(" ")[0]} — Abilities</span>
         <span className="ability-resource" style={{ color: resourceColor }}>
           {resourceName}: {currentResource}/{maxResource}
         </span>

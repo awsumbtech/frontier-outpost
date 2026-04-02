@@ -1,5 +1,6 @@
 import { getEffectiveStats } from '../../engine/operatives';
 import { CLASS_RESOURCE_NAMES, CLASS_RESOURCE_COLORS, CLASS_BASE_RESOURCE, STATUS_EFFECTS } from '../../data/constants';
+import SpriteIcon from '../../sprites/SpriteIcon';
 
 function EffectIconRow({ effects }) {
   if (!effects || effects.length === 0) return null;
@@ -7,7 +8,6 @@ function EffectIconRow({ effects }) {
     <div className="effect-icons">
       {effects.map((effect, i) => {
         const def = STATUS_EFFECTS[effect.id];
-        const icon = def ? def.icon : (effect.type === 'buff' ? '▲' : '▼');
         const name = def ? def.name : effect.id;
         const desc = def ? def.desc : '';
         const rounds = effect.remainingRounds ?? effect.duration ?? '?';
@@ -19,7 +19,7 @@ function EffectIconRow({ effects }) {
             className={`effect-icon ${isBuff ? 'effect-icon-buff' : 'effect-icon-debuff'}`}
             title={tooltipText}
           >
-            {icon}<span className="effect-duration">{rounds}</span>
+            <SpriteIcon spriteId={def?.spriteId || effect.id} size={12} /><span className="effect-duration">{rounds}</span>
           </span>
         );
       })}
@@ -44,7 +44,7 @@ export default function PartyStatusPanel({ squad, currentTurnId }) {
 
         return (
           <div key={op.id} className={`party-status-row${!op.alive ? " party-status-dead" : ""}${isCurrent ? " party-status-active" : ""}`}>
-            <span className="party-status-icon">{op.icon}</span>
+            <span className="party-status-icon"><SpriteIcon spriteId={op.spriteId} size={14} color={op.color} /></span>
             <span className="party-status-name">{op.name.split(" ")[0]}</span>
             {op.defending && <span className="party-status-def">DEF</span>}
             <EffectIconRow effects={activeEffects} />

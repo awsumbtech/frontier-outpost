@@ -1,3 +1,5 @@
+import SpriteIcon from '../../sprites/SpriteIcon';
+
 export default function StimSelector({ stims, onChoose, onCancel }) {
   // Group stims by id and count them
   const grouped = {};
@@ -21,7 +23,7 @@ export default function StimSelector({ stims, onChoose, onCancel }) {
             className="stim-selector-item"
             onClick={() => onChoose(stim.firstIndex)}
           >
-            <span className="stim-icon">{stim.icon}</span>
+            <span className="stim-icon"><SpriteIcon spriteId={stim.spriteId || stim.id} size={20} /></span>
             <div className="stim-info">
               <span className="stim-name">{stim.name}</span>
               <span className="stim-desc">{stim.desc}</span>

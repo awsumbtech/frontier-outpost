@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { STORY_CHAPTERS } from '../../data/story';
+import SpriteIcon from '../../sprites/SpriteIcon';
 
 export default function CommsTab({ game, updateGame }) {
   const mc = game.missionsCompleted;
@@ -70,7 +71,7 @@ export default function CommsTab({ game, updateGame }) {
             <div className="memorial-header">IN MEMORIAM</div>
             {game.memorial.map((m, i) => (
               <div key={i} className="memorial-entry">
-                <span className="memorial-icon">{m.icon||'◆'}</span>
+                <span className="memorial-icon">{m.spriteId ? <SpriteIcon spriteId={m.spriteId} size={16} state="dead" color={m.color} /> : (m.icon||'◆')}</span>
                 <span className="memorial-name">{m.name}</span>
                 {(m.traits||[]).length>0&&<span className="memorial-traits">{m.traits.join(' · ')}</span>}
               </div>

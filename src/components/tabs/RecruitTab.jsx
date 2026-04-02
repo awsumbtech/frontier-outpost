@@ -1,4 +1,5 @@
 import { CLASSES } from '../../data/classes';
+import SpriteIcon from '../../sprites/SpriteIcon';
 
 export default function RecruitTab({ game, recruitOp }) {
   const can=game.squad.length<4;
@@ -7,7 +8,7 @@ export default function RecruitTab({ game, recruitOp }) {
     <div className="recruit-grid">{Object.entries(CLASSES).map(([key,cls])=>{
       const has=game.squad.some(o=>o.classKey===key);
       return (<div className="recruit-card" key={key}>
-        <div className="class-icon">{cls.icon}</div><h4 style={{color:cls.color}}>{cls.name}</h4><p>{cls.desc}</p>
+        <div className="class-icon"><SpriteIcon spriteId={cls.spriteId} size={40} color={cls.color} /></div><h4 style={{color:cls.color}}>{cls.name}</h4><p>{cls.desc}</p>
         <div className="op-card-stats" style={{marginTop:8}}>{Object.entries(cls.baseStats).slice(0,4).map(([k,v])=>(<div className="op-stat" key={k}><span className="op-stat-val">{v}</span><span className="op-stat-label">{k}</span></div>))}</div>
         <button className="btn btn-primary btn-sm" style={{marginTop:12,width:"100%"}} disabled={!can||game.credits<150} onClick={()=>recruitOp(key)}>{has?"Another":"Recruit"} 150¢</button>
       </div>);

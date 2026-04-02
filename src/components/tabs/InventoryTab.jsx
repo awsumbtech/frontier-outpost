@@ -3,6 +3,7 @@ import { RARITY_NAMES, RARITY_COLORS } from '../../data/constants';
 import { STIM_TYPES } from '../../data/gear';
 import { getEffectiveStats } from '../../engine/operatives';
 import ClassBadge from '../shared/ClassBadge';
+import SpriteIcon from '../../sprites/SpriteIcon';
 
 export default function InventoryTab({ game, invFilter, setInvFilter, stimTarget, setStimTarget, buyStim, useStim, scrapGear }) {
   const stims = game.stims || [];
@@ -91,7 +92,7 @@ export default function InventoryTab({ game, invFilter, setInvFilter, stimTarget
           const count = stims.filter(s => s.id === st.id).length;
           return (
             <div key={st.id} className="stim-chip" style={{'--stim-color': st.color}}>
-              <span className="stim-chip-icon">{st.icon}</span>
+              <span className="stim-chip-icon"><SpriteIcon spriteId={st.spriteId || st.id} size={20} /></span>
               <div className="stim-chip-info">
                 <span className="stim-chip-name">{st.name}</span>
                 <span className="stim-chip-desc">{st.desc}</span>
@@ -119,7 +120,7 @@ export default function InventoryTab({ game, invFilter, setInvFilter, stimTarget
           const s = getEffectiveStats(op);
           const hpPct = Math.round((op.currentHp / s.hp) * 100);
           return (<div key={op.id} className="inv-item" onClick={() => { useStim(stimTarget.stimIdx, op.id); setStimTarget(null); }}>
-            <span style={{fontSize:18}}>{op.icon}</span>
+            <span style={{fontSize:18}}><SpriteIcon spriteId={op.spriteId} size={18} color={op.color} /></span>
             <div style={{flex:1}}>
               <div style={{fontSize:"var(--font-sm)",fontWeight:600,color:op.color}}>{op.name}</div>
               <div style={{fontSize:"var(--font-xs)",color:"var(--text2)"}}>HP: {op.currentHp}/{s.hp} ({hpPct}%) · Shield: {op.currentShield}/{s.shield}</div>

@@ -1,6 +1,6 @@
 export const CLASSES = {
   VANGUARD: {
-    name: "Vanguard", icon: "🛡️", color: "#3b82f6",
+    name: "Vanguard", icon: "🛡️", spriteId: "vanguard", color: "#3b82f6",
     desc: "Heavy frontliner. Draws fire, absorbs hits, protects the squad.",
     baseStats: { hp: 140, armor: 18, shield: 25, damage: 10, speed: 7, crit: 2, evasion: 1 },
     abilities: [
@@ -35,7 +35,7 @@ export const CLASSES = {
     }
   },
   RECON: {
-    name: "Recon", icon: "🎯", color: "#ef4444",
+    name: "Recon", icon: "🎯", spriteId: "recon", color: "#ef4444",
     desc: "Precision killer. Marks targets, exploits weaknesses, strikes lethally.",
     baseStats: { hp: 65, armor: 4, shield: 8, damage: 24, speed: 17, crit: 20, evasion: 16 },
     abilities: [
@@ -70,7 +70,7 @@ export const CLASSES = {
     }
   },
   ENGINEER: {
-    name: "Engineer", icon: "⚙️", color: "#f59e0b",
+    name: "Engineer", icon: "⚙️", spriteId: "engineer", color: "#f59e0b",
     desc: "Tech controller. Deploys systems, hacks enemies, controls the field.",
     baseStats: { hp: 85, armor: 10, shield: 18, damage: 14, speed: 10, crit: 5, evasion: 4 },
     abilities: [
@@ -105,7 +105,7 @@ export const CLASSES = {
     }
   },
   MEDIC: {
-    name: "Medic", icon: "💉", color: "#22c55e",
+    name: "Medic", icon: "💉", spriteId: "medic", color: "#22c55e",
     desc: "Combat lifeline. Heals, revives, cleanses, and keeps everyone fighting.",
     baseStats: { hp: 90, armor: 8, shield: 15, damage: 8, speed: 13, crit: 3, evasion: 6 },
     abilities: [

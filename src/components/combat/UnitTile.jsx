@@ -1,12 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { STATUS_EFFECTS } from '../../data/constants';
+import SpriteIcon from '../../sprites/SpriteIcon';
+import { enemySpriteKey } from '../../sprites/index';
 
-const ENEMY_ICONS = {
-  "Feral Drone": "🤖", "Scav Raider": "🏴", "Spore Beast": "🍄",
-  "Rogue Mech": "⚙️", "Xeno Stalker": "👾", "Hive Swarm": "🐝",
-  "Heavy Sentinel": "🛡️", "Psi-Wraith": "👻",
-  "Apex Predator": "🦎", "Core Guardian": "💎",
-};
 
 export default function UnitTile({ unit, isAlly, highlight, stats, isCurrentTurn, defending, selectable, onClick }) {
   const [flashing, setFlashing] = useState(false);
@@ -29,7 +25,6 @@ export default function UnitTile({ unit, isAlly, highlight, stats, isCurrentTurn
   const shieldMax = isAlly ? stats.shield : 0;
   const shieldPct = shieldMax > 0 ? Math.max(0, (unit.currentShield / shieldMax) * 100) : 0;
 
-  const icon = isAlly ? unit.icon : (ENEMY_ICONS[unit.name] || unit.name[0]);
   const name = isAlly ? unit.name.split(" ")[0] : unit.name;
   const unitColor = isAlly ? unit.color : undefined;
 
@@ -53,7 +48,14 @@ export default function UnitTile({ unit, isAlly, highlight, stats, isCurrentTurn
       tabIndex={selectable ? 0 : undefined}
     >
       {isAlly && <span className="unit-tile-level">L{unit.level}</span>}
-      <div className="unit-tile-icon">{icon}</div>
+      <div className="unit-tile-icon">
+        <SpriteIcon
+          spriteId={isAlly ? unit.spriteId : enemySpriteKey(unit.name)}
+          size={28}
+          state={!unit.alive ? 'dead' : flashing ? 'damage' : defending ? 'defending' : unit.stunned ? 'stunned' : 'idle'}
+          color={unitColor}
+        />
+      </div>
       <div className="unit-tile-name">{name}</div>
       <div className="unit-tile-hp-bar">
         <div className="bar-fill" style={{ width: `${hpPct}%`, background: hpColor }} />
@@ -67,7 +69,6 @@ export default function UnitTile({ unit, isAlly, highlight, stats, isCurrentTurn
         <div className="effect-icons">
           {unit.activeEffects.map((effect, i) => {
             const def = STATUS_EFFECTS[effect.id];
-            const icon = def ? def.icon : (effect.type === 'buff' ? '▲' : '▼');
             const name = def ? def.name : effect.id;
             const desc = def ? def.desc : '';
             const rounds = effect.remainingRounds ?? effect.duration ?? '?';
@@ -79,7 +80,7 @@ export default function UnitTile({ unit, isAlly, highlight, stats, isCurrentTurn
                 className={`effect-icon ${isBuff ? 'effect-icon-buff' : 'effect-icon-debuff'}`}
                 title={tooltipText}
               >
-                {icon}<span className="effect-duration">{rounds}</span>
+                <SpriteIcon spriteId={def?.spriteId || effect.id} size={12} /><span className="effect-duration">{rounds}</span>
               </span>
             );
           })}
