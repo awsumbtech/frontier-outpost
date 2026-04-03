@@ -35,6 +35,7 @@ export default class MapScene extends Phaser.Scene {
     this.renderTilemap(terrain, width, height);
 
     // Render exit marker
+    const isLinear = this.mapData.layout === "linear";
     const exitEntity = entities.find(e => e.type === "exit");
     if (exitEntity) {
       this.exitMarker = this.add.rectangle(
@@ -46,16 +47,27 @@ export default class MapScene extends Phaser.Scene {
       this.exitMarker.setStrokeStyle(2, 0xffa502);
       this.exitMarker.setDepth(5);
       // Pulse animation
-      this.tweens.add({
+      this.exitPulseTween = this.tweens.add({
         targets: this.exitMarker,
         alpha: { from: 0.3, to: 0.8 },
         duration: 800,
         yoyo: true,
         repeat: -1,
       });
-      // Exit is always visible — encounters are incidental, not required
-      this.exitMarker.setVisible(true);
-      this.exitActive = true;
+
+      if (isLinear) {
+        // Linear: exit starts locked — dimmed, no pulse, inactive
+        this.exitMarker.setVisible(true);
+        this.exitMarker.setFillStyle(0x555555, 0.15);
+        this.exitMarker.setStrokeStyle(2, 0x555555);
+        this.exitPulseTween.pause();
+        this.exitMarker.setAlpha(0.2);
+        this.exitActive = false;
+      } else {
+        // Open: exit always active
+        this.exitMarker.setVisible(true);
+        this.exitActive = true;
+      }
     }
 
     // Create player at spawn or saved position
@@ -111,8 +123,8 @@ export default class MapScene extends Phaser.Scene {
   }
 
   onPlayerStep(data) {
-    // Check for exit tile — exit is always active
-    if (data.tile === TILE.EXIT) {
+    // Check for exit tile
+    if (data.tile === TILE.EXIT && this.exitActive) {
       this.eventBridge.emit("map:exit", {
         stepsTotal: data.stepCount,
         encounterState: this.encounterSystem.getState(),
@@ -149,7 +161,17 @@ export default class MapScene extends Phaser.Scene {
     if (this.player) {
       this.player.moving = false;
     }
-    // Exit is always visible — no gating on encounters
+
+    // On linear maps: activate exit once all encounters are cleared
+    if (!this.exitActive && this.encounterSystem.isComplete() && this.exitMarker) {
+      this.exitActive = true;
+      this.exitMarker.setFillStyle(0xffa502, 0.3);
+      this.exitMarker.setStrokeStyle(2, 0xffa502);
+      this.exitMarker.setAlpha(0.3);
+      if (this.exitPulseTween) this.exitPulseTween.resume();
+      // Brief flash to draw attention to the now-active exit
+      this.cameras.main.flash(200, 255, 165, 2, true);
+    }
   }
 
   update() {

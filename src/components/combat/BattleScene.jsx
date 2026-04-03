@@ -1,4 +1,5 @@
 import { getEffectiveStats } from '../../engine/operatives';
+import useAnimationQueue from '../../hooks/useAnimationQueue';
 import UnitTile from './UnitTile';
 import TurnOrderBar from './TurnOrderBar';
 
@@ -13,11 +14,14 @@ export default function BattleScene({
   missionTypeName, environment, stims,
   selectAttack, selectDefend, selectItem, chooseStim, chooseTarget, cancelSelection,
   selectAbility, chooseAbility, chooseAllyTarget,
+  lastAction,
 }) {
   const currentTurnEntry = turnState?.turnQueue?.[turnState.turnIndex];
   const currentTurnId = currentTurnEntry?.unitId;
   const isAllyTurn = currentTurnEntry?.isAlly;
   const subPhase = turnState?.subPhase;
+
+  const { getUnitAnimState, screenShake } = useAnimationQueue(lastAction);
 
   // Determine which operative is acting
   const currentOp = isAllyTurn ? squad.find(o => o.id === currentTurnId) : null;
@@ -45,7 +49,7 @@ export default function BattleScene({
   }
 
   return (
-    <div className={`battlefield battlefield-ff ${environment?.cssClass || ''}`}>
+    <div className={`battlefield battlefield-ff ${environment?.cssClass || ''}${screenShake ? ' battlefield-shake' : ''}`}>
       {environment && (
         <>
           <div className="env-background" style={{ backgroundImage: `url(${environment.backgroundImage})` }} />
@@ -63,8 +67,10 @@ export default function BattleScene({
               unit={e}
               isAlly={false}
               highlight={currentTurnId === e.id}
+              isCurrentTurn={currentTurnId === e.id && !isAllyTurn}
               selectable={enemyTargetable}
               onClick={enemyTargetable ? () => handleEnemyClick(e.id) : undefined}
+              animState={getUnitAnimState(e.id, false)}
             />
           ))}
         </div>
@@ -91,46 +97,52 @@ export default function BattleScene({
               defending={op.defending}
               selectable={allyTargetable && (op.alive || turnState?.selectedAbilityId === 'revive')}
               onClick={allyTargetable && (op.alive || turnState?.selectedAbilityId === 'revive') ? () => handleAllyClick(op.id) : undefined}
+              animState={getUnitAnimState(op.id, true)}
             />
           ))}
         </div>
       </div>
 
-      {/* Bottom panels — FF style */}
+      {/* Bottom panels — FF style dialog boxes */}
       <div className="ff-bottom-panels">
-        <PartyStatusPanel squad={squad} currentTurnId={currentTurnId} />
-        <div className="ff-right-panel">
-          {subPhase === "selectItem" && (
-            <StimSelector stims={stims || []} onChoose={chooseStim} onCancel={cancelSelection} />
-          )}
-          {subPhase === "selectAbility" && (
-            <AbilitySelector
-              operative={currentOp}
-              onChoose={chooseAbility}
-              onCancel={cancelSelection}
-            />
-          )}
-          {(subPhase === "awaitingAction" || subPhase === "selectTarget" || subPhase === "selectItemTarget" || subPhase === "selectAbilityTarget" || subPhase === "selectAbilityAllyTarget") && (
-            <ActionMenu
-              operative={currentOp}
-              turnState={turnState}
-              stims={stims}
-              onAttack={selectAttack}
-              onDefend={selectDefend}
-              onItem={selectItem}
-              onAbility={selectAbility}
-            />
-          )}
-          {(subPhase === "selectTarget" || subPhase === "selectAbilityTarget" || subPhase === "selectAbilityAllyTarget") && (
-            <button className="action-cancel-btn" onClick={cancelSelection}>Cancel</button>
-          )}
-          {subPhase === "selectItemTarget" && (
-            <button className="action-cancel-btn" onClick={cancelSelection}>Cancel</button>
-          )}
+        <div className="combat-dialog-box dialog-left">
+          <div className="combat-dialog-label">Comms Log</div>
+          <CompactLog combatLog={combatLog} logRef={logRef} />
+        </div>
+        <div className="combat-dialog-box dialog-right">
+          <PartyStatusPanel squad={squad} currentTurnId={currentTurnId} />
+          <hr className="dialog-separator" />
+          <div className="ff-right-panel">
+            {subPhase === "selectItem" && (
+              <StimSelector stims={stims || []} onChoose={chooseStim} onCancel={cancelSelection} />
+            )}
+            {subPhase === "selectAbility" && (
+              <AbilitySelector
+                operative={currentOp}
+                onChoose={chooseAbility}
+                onCancel={cancelSelection}
+              />
+            )}
+            {(subPhase === "awaitingAction" || subPhase === "selectTarget" || subPhase === "selectItemTarget" || subPhase === "selectAbilityTarget" || subPhase === "selectAbilityAllyTarget") && (
+              <ActionMenu
+                operative={currentOp}
+                turnState={turnState}
+                stims={stims}
+                onAttack={selectAttack}
+                onDefend={selectDefend}
+                onItem={selectItem}
+                onAbility={selectAbility}
+              />
+            )}
+            {(subPhase === "selectTarget" || subPhase === "selectAbilityTarget" || subPhase === "selectAbilityAllyTarget") && (
+              <button className="action-cancel-btn" onClick={cancelSelection}>Cancel</button>
+            )}
+            {subPhase === "selectItemTarget" && (
+              <button className="action-cancel-btn" onClick={cancelSelection}>Cancel</button>
+            )}
+          </div>
         </div>
       </div>
-
-      <CompactLog combatLog={combatLog} logRef={logRef} />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import SpriteIcon from '../../sprites/SpriteIcon';
 import { enemySpriteKey } from '../../sprites/index';
 
 
-export default function UnitTile({ unit, isAlly, highlight, stats, isCurrentTurn, defending, selectable, onClick }) {
+export default function UnitTile({ unit, isAlly, highlight, stats, isCurrentTurn, defending, selectable, onClick, animState }) {
   const [flashing, setFlashing] = useState(false);
   const hp = isAlly ? unit.currentHp : unit.hp;
   const maxHp = isAlly ? stats.hp : unit.maxHp;
@@ -35,8 +35,10 @@ export default function UnitTile({ unit, isAlly, highlight, stats, isCurrentTurn
     highlight && "unit-highlight",
     flashing && "unit-damage-flash",
     isCurrentTurn && "unit-current-turn",
+    isCurrentTurn && "unit-step-forward",
     defending && "unit-defending",
     selectable && "unit-selectable",
+    animState?.className,
   ].filter(Boolean).join(" ");
 
   return (
@@ -85,6 +87,9 @@ export default function UnitTile({ unit, isAlly, highlight, stats, isCurrentTurn
             );
           })}
         </div>
+      )}
+      {isAlly && unit.activeEffects?.some(e => e.stat === 'turretActive') && (
+        <div className={`drone-companion${animState?.droneFiring ? ' drone-firing' : ''}`} />
       )}
       {unit.stunned && <div className="unit-tile-status">STUN</div>}
       {defending && <div className="unit-tile-status unit-tile-defend-status">DEF</div>}

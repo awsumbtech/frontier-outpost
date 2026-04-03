@@ -24,6 +24,7 @@ import {
   tickEnemyCooldowns,
 } from "../engine/combat";
 import { getEnvironmentForMission } from "../engine/environments";
+import { ANIM_DURATIONS, classifyAttackType } from "./useAnimationQueue";
 import { selectBark, selectBanter, getInlineStory, getDecisionEcho, getEnvFlavor, selectStoryReaction, selectDeathReaction } from "../engine/personality";
 import { generateMapForMission } from "../engine/mapgen";
 import EventBridge from "../phaser/EventBridge";
@@ -38,6 +39,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
   const [storyReactions, setStoryReactions] = useState([]);
   const [mapData, setMapData] = useState(null);
   const [playerPos, setPlayerPos] = useState(null);
+  const [lastAction, setLastAction] = useState(null);
   const logRef = useRef(null);
   const recentBarksRef = useRef([]);
   const barkBudgetRef = useRef(2);
@@ -58,6 +60,9 @@ export default function useMission(game, setGame, updateGame, setTab) {
     function onMapEncounter(data) {
       // Save player position for return after combat
       setPlayerPos(data.position);
+
+      // Reset animation state for new encounter
+      setLastAction(null);
 
       // Generate enemies for this encounter
       setMission(m => {
@@ -246,6 +251,9 @@ export default function useMission(game, setGame, updateGame, setTab) {
         applySquadState(abilitySquad);
         applyEnemyState(abilityEnemies);
 
+        // Signal animation
+        setLastAction({ type: 'enemyAbility', attackerId: entry.unitId, targetId: null, logEntries: [{ text: abilityResult.logEntry, type: "ability" }], isAlly: false });
+
         injectBark([{ text: abilityResult.logEntry }], abilitySquad, abilityEnemies);
 
         const endResult = checkCombatEnd(abilitySquad, abilityEnemies);
@@ -256,7 +264,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
 
         const nextTs = { ...ts, turnIndex: ts.turnIndex + 1 };
         setTurnState(nextTs);
-        enemyTimerRef.current = setTimeout(() => advanceTurn(nextTs, abilitySquad, abilityEnemies), 600);
+        enemyTimerRef.current = setTimeout(() => advanceTurn(nextTs, abilitySquad, abilityEnemies), ANIM_DURATIONS.debuff + 100);
         return;
       }
     }
@@ -266,6 +274,10 @@ export default function useMission(game, setGame, updateGame, setTab) {
     if (etLog.length > 0) setCombatLog(p => [...p, ...etLog]);
     applySquadState(etSquad);
     applyEnemyState(etEnemies);
+
+    // Signal animation
+    const etTarget = etLog.find(l => l.targetId)?.targetId || null;
+    setLastAction({ type: 'attack', attackerId: entry.unitId, targetId: etTarget, logEntries: etLog, isAlly: false });
 
     // Inject bark on enemy action
     injectBark(etLog, etSquad, currentEnemies);
@@ -277,10 +289,10 @@ export default function useMission(game, setGame, updateGame, setTab) {
       return;
     }
 
-    // Advance to next turn with delay so player can see enemy action
+    // Advance to next turn with delay so player can see enemy action + animation
     const nextTs = { ...ts, turnIndex: ts.turnIndex + 1 };
     setTurnState(nextTs);
-    enemyTimerRef.current = setTimeout(() => advanceTurn(nextTs, etSquad, etEnemies), 600);
+    enemyTimerRef.current = setTimeout(() => advanceTurn(nextTs, etSquad, etEnemies), ANIM_DURATIONS.melee + 100);
   }
 
   // ── Player Action Handlers ──
@@ -313,7 +325,8 @@ export default function useMission(game, setGame, updateGame, setTab) {
 
       const nextTs = { ...ts, turnIndex: ts.turnIndex + 1, subPhase: "processing", defendingUnitIds: newDefending };
 
-      setTimeout(() => advanceTurn(nextTs, pSquad, pEnemies), 300);
+      setLastAction({ type: 'defend', attackerId: entry.unitId, targetId: entry.unitId, logEntries: dLog, isAlly: true });
+      setTimeout(() => advanceTurn(nextTs, pSquad, pEnemies), ANIM_DURATIONS.defend + 50);
       return nextTs;
     });
   }
@@ -362,6 +375,19 @@ export default function useMission(game, setGame, updateGame, setTab) {
     applySquadState(aSquad);
     applyEnemyState(aEnemies);
 
+    // Signal animation — look up ability def for classification
+    const operative = currentSquad.find(o => o.id === entry.unitId);
+    const cls = operative ? CLASSES[operative.classKey] : null;
+    const ability = cls?.abilities?.find(a => a.id === abilityId);
+    const aliveEnemyIds = aEnemies.filter(e => e.alive).map(e => e.id);
+    const actionMeta = {
+      type: 'ability', attackerId: entry.unitId, targetId,
+      effectType: ability?.effectType, targetType: ability?.targetType,
+      logEntries: aLog, isAlly: true, allEnemyIds: aliveEnemyIds,
+    };
+    setLastAction(actionMeta);
+    const animType = classifyAttackType(actionMeta);
+
     // Inject bark
     injectBark(aLog, aSquad, aEnemies);
 
@@ -375,7 +401,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
     // Advance to next turn
     const nextTs = { ...turnState, turnIndex: turnState.turnIndex + 1, subPhase: "processing" };
     setTurnState(nextTs);
-    setTimeout(() => advanceTurn(nextTs, aSquad, aEnemies), 300);
+    setTimeout(() => advanceTurn(nextTs, aSquad, aEnemies), (ANIM_DURATIONS[animType] || 650) + 50);
   }
 
   function chooseAllyTarget(allyId) {
@@ -416,8 +442,13 @@ export default function useMission(game, setGame, updateGame, setTab) {
       applySquadState(pSquad);
       applyEnemyState(pEnemies);
 
+      // Signal animation
+      const allLogs = [...aLog, ...pLog];
+      const aliveEnemyIds = pEnemies.filter(e => e.alive).map(e => e.id);
+      setLastAction({ type: 'attack', attackerId: entry.unitId, targetId, logEntries: allLogs, isAlly: true, allEnemyIds: aliveEnemyIds });
+
       // Inject bark
-      injectBark([...aLog, ...pLog], pSquad, pEnemies);
+      injectBark(allLogs, pSquad, pEnemies);
 
       // Check combat end
       const endResult = checkCombatEnd(pSquad, pEnemies);
@@ -429,7 +460,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
       // Advance to next turn
       const nextTs = { ...turnState, turnIndex: turnState.turnIndex + 1, subPhase: "processing" };
       setTurnState(nextTs);
-      setTimeout(() => advanceTurn(nextTs, pSquad, pEnemies), 300);
+      setTimeout(() => advanceTurn(nextTs, pSquad, pEnemies), ANIM_DURATIONS.melee + 50);
 
     } else if (turnState.selectedAction === "item") {
       executeStimAndAdvance(turnState.selectedStimIndex, targetId);
@@ -459,9 +490,11 @@ export default function useMission(game, setGame, updateGame, setTab) {
     if (pLog.length > 0) setCombatLog(p => [...p, ...pLog]);
     applySquadState(pSquad);
 
+    setLastAction({ type: 'item', attackerId: entry.unitId, targetId: targetId || entry.unitId, logEntries: iLog, isAlly: true });
+
     const nextTs = { ...turnState, turnIndex: turnState.turnIndex + 1, subPhase: "processing" };
     setTurnState(nextTs);
-    setTimeout(() => advanceTurn(nextTs, pSquad, pEnemies), 300);
+    setTimeout(() => advanceTurn(nextTs, pSquad, pEnemies), ANIM_DURATIONS.item + 50);
   }
 
   function cancelSelection() {
@@ -713,7 +746,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
 
   return {
     mission, combatLog, decision, missionResult, logRef,
-    turnState,
+    turnState, lastAction,
     banter, storyReactions,
     mapData, playerPos, eventBridge: eventBridgeRef.current,
     startMission, advanceMission, handleDecision, resetMission, advanceDebrief,

@@ -80,7 +80,9 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 
 /* ─── COMBAT LOG ─── */
 .combat-log{font-family:'Share Tech Mono',monospace;font-size:var(--font-sm);background:rgba(0,0,0,.35);border:1px solid var(--border);border-radius:6px;padding:var(--space-sm);overflow-y:auto;-webkit-overflow-scrolling:touch;line-height:1.5;flex:1;min-height:80px}
-.log-line{padding:2px 0;animation:slideInLog 0.2s ease both}.log-round{color:var(--accent);font-weight:bold;margin-top:var(--space-sm);padding-top:var(--space-xs);border-top:1px solid rgba(0,212,255,.15);text-shadow:0 0 6px rgba(var(--glow-accent),0.4)}
+.log-line{padding:2px 0;animation:slideInLog 0.2s ease both}
+.log-flavor{color:var(--text2);font-style:italic;opacity:0.6;font-size:0.9em}
+.log-round{color:var(--accent);font-weight:bold;margin-top:var(--space-sm);padding-top:var(--space-xs);border-top:1px solid rgba(0,212,255,.15);text-shadow:0 0 6px rgba(var(--glow-accent),0.4)}
 .log-ally{color:#8bc7ff}.log-enemy{color:#ff8a8a}.log-crit,.log-critkill{color:var(--warning);font-weight:bold}
 .log-kill{color:var(--danger);font-weight:bold;text-shadow:0 0 8px rgba(var(--glow-danger),0.5)}.log-allyDown{color:#ff6b81;font-weight:bold;background:rgba(255,71,87,.08);padding:0 4px;border-radius:3px}
 .log-heal{color:var(--success);text-shadow:0 0 6px rgba(var(--glow-success),0.4)}.log-evade{color:#a78bfa;font-style:italic}.log-counter{color:#a78bfa}
@@ -270,7 +272,7 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 @keyframes bannerFadeIn{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:scale(1)}}
 
 /* ─── COMPACT LOG ─── */
-.compact-log{max-height:90px;overflow-y:auto;padding:6px 10px;background:rgba(0,0,0,0.45);border-top:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:var(--font-xxs);line-height:1.5;z-index:1;flex-shrink:0}
+.compact-log{flex:1;overflow-y:auto;font-family:'Share Tech Mono',monospace;font-size:var(--font-xxs);line-height:1.5}
 .compact-log::-webkit-scrollbar{width:3px}
 .compact-log::-webkit-scrollbar-thumb{background:var(--border2)}
 
@@ -494,7 +496,7 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 /* ─── FF TURN-BASED COMBAT ─── */
 
 /* FF layout: enemies left, allies right */
-.battle-field-ff{grid-template-columns:1fr 40px 1fr;overflow-y:auto;gap:6px;padding:6px 8px}
+.battle-field-ff{grid-template-columns:1fr 100px 1fr;overflow-y:auto;gap:6px;padding:6px 8px}
 .battlefield-ff .enemy-formation{justify-self:end}
 .battlefield-ff .ally-formation{justify-self:start}
 .battlefield-ff .enemy-formation,.battlefield-ff .ally-formation{gap:4px}
@@ -519,9 +521,59 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 .unit-tile.unit-current-turn{border-color:var(--accent)!important;border-width:2px;box-shadow:0 0 20px rgba(var(--glow-accent),0.5),inset 0 0 10px rgba(var(--glow-accent),0.15);animation:currentTurnGlow 1s ease infinite alternate}
 @keyframes currentTurnGlow{0%{box-shadow:0 0 12px rgba(var(--glow-accent),0.3),inset 0 0 6px rgba(var(--glow-accent),0.1)}100%{box-shadow:0 0 24px rgba(var(--glow-accent),0.6),inset 0 0 12px rgba(var(--glow-accent),0.2)}}
 
+/* Step-forward: active turn unit slides toward center */
+.unit-tile{transition:transform 0.3s ease-out,border-color 0.2s,box-shadow 0.2s}
+.unit-tile.unit-step-forward.unit-ally{transform:translateX(-20px)}
+.unit-tile.unit-step-forward.unit-enemy{transform:translateX(20px)}
+
+/* ─── ATTACK ANIMATIONS ─── */
+
+/* Melee dash: ally dashes left toward enemies, enemy dashes right toward allies */
+.unit-tile.anim-dash-left{transform:translateX(-100px);transition:transform 0.25s ease-in}
+.unit-tile.anim-dash-right{transform:translateX(100px);transition:transform 0.25s ease-in}
+
+/* Ranged recoil: slight kickback */
+.unit-tile.anim-recoil-left{transform:translateX(6px);transition:transform 0.15s ease-out}
+.unit-tile.anim-recoil-right{transform:translateX(-6px);transition:transform 0.15s ease-out}
+
+/* Windup glow for AoE/buff/heal casters */
+.unit-tile.anim-windup{animation:animWindup 0.2s ease forwards}
+@keyframes animWindup{0%{filter:brightness(1)}100%{filter:brightness(1.4) drop-shadow(0 0 8px var(--accent))}}
+
+/* Impact shake on target */
+.unit-tile.anim-impact-shake{animation:impactShake 0.2s ease}
+@keyframes impactShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+
+/* AoE burst on all targets */
+.unit-tile.anim-aoe-impact{animation:aoeBurst 0.4s ease}
+@keyframes aoeBurst{0%{background-color:transparent;transform:scale(1)}30%{background-color:rgba(251,146,56,0.35);transform:scale(1.05)}60%{background-color:rgba(255,71,87,0.2);transform:scale(0.98)}100%{background-color:transparent;transform:scale(1)}}
+
+/* Heal glow on target */
+.unit-tile.anim-heal-glow{animation:healGlow 0.4s ease}
+@keyframes healGlow{0%{box-shadow:0 0 0 rgba(46,213,115,0)}50%{box-shadow:0 0 20px rgba(46,213,115,0.6),inset 0 0 10px rgba(46,213,115,0.3)}100%{box-shadow:0 0 0 rgba(46,213,115,0)}}
+
+/* Buff pulse */
+.unit-tile.anim-buff-pulse{animation:buffPulse 0.35s ease}
+@keyframes buffPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3) saturate(1.2) drop-shadow(0 0 6px var(--accent))}}
+
+/* Debuff pulse */
+.unit-tile.anim-debuff-pulse{animation:debuffPulse 0.35s ease}
+@keyframes debuffPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(0.7) saturate(0.5);box-shadow:0 0 12px rgba(255,71,87,0.4)}}
+
+/* Screen shake on crit */
+.battlefield-shake{animation:screenShake 0.3s ease}
+@keyframes screenShake{0%,100%{transform:translate(0,0)}15%{transform:translate(-3px,2px)}30%{transform:translate(4px,-2px)}45%{transform:translate(-2px,-1px)}60%{transform:translate(3px,1px)}75%{transform:translate(-1px,2px)}}
+
+/* ─── ENGINEER DRONE ─── */
+.drone-companion{position:absolute;top:-8px;right:-4px;width:14px;height:8px;background:var(--unit-color,#fbbf24);border-radius:3px;opacity:0.85;animation:droneHover 2s ease-in-out infinite alternate;z-index:5;pointer-events:none}
+.drone-companion::after{content:'';position:absolute;bottom:-3px;left:50%;transform:translateX(-50%);width:8px;height:2px;background:var(--unit-color,#fbbf24);opacity:0.3;border-radius:50%}
+@keyframes droneHover{0%{transform:translateY(0)}100%{transform:translateY(-3px)}}
+.drone-firing{animation:droneFire 0.4s ease!important}
+@keyframes droneFire{0%{filter:brightness(1);transform:scale(1)}30%{filter:brightness(2) drop-shadow(0 0 4px var(--unit-color,#fbbf24));transform:scale(1.3)}100%{filter:brightness(1);transform:scale(1)}}
+
 /* Selectable / targetable units */
 .unit-tile.unit-selectable{cursor:pointer;border-color:var(--warning)!important;animation:selectablePulse 0.8s ease infinite alternate;position:relative;z-index:4}
-.unit-tile.unit-selectable:hover{border-color:var(--accent)!important;box-shadow:0 0 16px rgba(var(--glow-accent),0.5);transform:scale(1.05)}
+.unit-tile.unit-selectable:hover{border-color:var(--accent)!important;box-shadow:0 0 16px rgba(var(--glow-accent),0.5);transform:scale(1.08)}
 @keyframes selectablePulse{0%{box-shadow:0 0 4px rgba(255,165,0,0.2)}100%{box-shadow:0 0 12px rgba(255,165,0,0.5)}}
 
 /* Defending unit */
@@ -530,7 +582,16 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
 .unit-tile-defend-status{color:var(--accent)!important;font-weight:700}
 
 /* Bottom panels — FF style split layout */
-.ff-bottom-panels{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px 8px;position:relative;z-index:3;background:rgba(10,12,16,0.98);border-top:1px solid var(--border);flex-shrink:0}
+.ff-bottom-panels{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;padding:6px 8px;position:relative;z-index:3;background:rgba(10,12,16,0.98);border-top:1px solid var(--border);flex-shrink:0}
+
+/* Dialog box containers for bottom panels */
+.combat-dialog-box{background:rgba(0,0,0,0.5);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;overflow:hidden}
+.dialog-left{max-height:130px;overflow-y:auto;display:flex;flex-direction:column}
+.dialog-left::-webkit-scrollbar{width:3px}
+.dialog-left::-webkit-scrollbar-thumb{background:var(--border2)}
+.dialog-left .combat-dialog-label{font-size:8px;font-family:'Share Tech Mono',monospace;text-transform:uppercase;letter-spacing:1px;color:var(--accent);opacity:0.6;margin-bottom:4px;flex-shrink:0}
+.dialog-right{display:flex;flex-direction:column;gap:4px}
+.dialog-right .dialog-separator{border:none;border-top:1px solid var(--border);margin:2px 0;opacity:0.4}
 
 /* Party Status Panel — bottom left */
 .party-status-panel{display:flex;flex-direction:column;gap:2px;padding:2px 0}
@@ -646,12 +707,15 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
   .turn-icon.turn-active{width:48px;height:62px;font-size:20px}
   .turn-icon .turn-name{font-size:8px}
   .action-banner{max-width:280px;font-size:var(--font-body)}
-  .compact-log{max-height:110px;font-size:var(--font-xs)}
+  .compact-log{font-size:var(--font-xs)}
+  .dialog-left{max-height:150px}
   .btn{padding:12px 20px;font-size:var(--font-sm)}
   .modal{max-width:560px}
 
   /* FF desktop enhancements */
   .ff-bottom-panels{padding:8px 24px;gap:12px}
+  .combat-dialog-box{padding:8px 10px}
+  .dialog-left{max-height:160px}
   .action-btn{padding:10px 8px}
   .action-btn-icon{font-size:20px}
   .action-btn-label{font-size:var(--font-xxs)}
@@ -660,7 +724,7 @@ body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-seri
   .battlefield-ff .unit-tile-name{font-size:var(--font-xxs)}
   .battlefield-ff .unit-tile-hp-bar{height:5px}
   .battlefield-ff .unit-tile-level{font-size:8px}
-  .battle-field-ff{gap:8px;padding:8px 24px}
+  .battle-field-ff{gap:12px;padding:8px 24px;grid-template-columns:1fr 120px 1fr}
   .battlefield-ff .enemy-formation,.battlefield-ff .ally-formation{gap:6px}
   .party-status-name{width:80px}
   .party-status-row{padding:3px 8px;gap:8px}

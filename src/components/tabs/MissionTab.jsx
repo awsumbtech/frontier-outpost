@@ -13,6 +13,7 @@ export default function MissionTab({
   startMission, advanceMission, handleDecision, resetMission, advanceDebrief,
   selectAttack, selectDefend, selectItem, chooseStim, chooseTarget, cancelSelection,
   selectAbility, chooseAbility, chooseAllyTarget,
+  lastAction,
 }) {
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [encounterInfo, setEncounterInfo] = useState(null);
@@ -160,6 +161,7 @@ export default function MissionTab({
         selectAbility={selectAbility}
         chooseAbility={chooseAbility}
         chooseAllyTarget={chooseAllyTarget}
+        lastAction={lastAction}
       />
     )}
     <div className="sticky-bar">
