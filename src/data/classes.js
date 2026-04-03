@@ -1,8 +1,14 @@
 export const CLASSES = {
   VANGUARD: {
-    name: "Vanguard", icon: "🛡️", color: "#3b82f6",
+    name: "Vanguard", icon: "🛡️", spriteId: "vanguard", color: "#3b82f6",
     desc: "Heavy frontliner. Draws fire, absorbs hits, protects the squad.",
     baseStats: { hp: 140, armor: 18, shield: 25, damage: 10, speed: 7, crit: 2, evasion: 1 },
+    abilities: [
+      { id: "shieldWall", name: "Shield Wall", cost: 15, desc: "+50% armor for 2 rounds", unlockSkill: "Fortify", targetType: "self", effectType: "buff", effect: { stat: "armor", modifier: 0.5, duration: 2 } },
+      { id: "taunt", name: "Taunt", cost: 10, desc: "Force enemies to target you for 1 round", unlockSkill: "Provoke", targetType: "self", effectType: "buff", effect: { stat: "taunt", modifier: 1.0, duration: 1, forceTaunt: true } },
+      { id: "intercept", name: "Intercept", cost: 20, desc: "Guard an ally — take hits for them this round", unlockSkill: "Guardian Stance", targetType: "ally", effectType: "buff", effect: { stat: "intercepted", duration: 1, interceptBy: "self" } },
+      { id: "powerStrike", name: "Power Strike", cost: 12, desc: "Attack at 1.5x damage", unlockSkill: "Cover Fire", targetType: "enemy", effectType: "attack", effect: { damageMultiplier: 1.5 } },
+    ],
     branches: {
       BULWARK: {
         name: "Bulwark", desc: "Immovable wall",
@@ -29,9 +35,15 @@ export const CLASSES = {
     }
   },
   RECON: {
-    name: "Recon", icon: "🎯", color: "#ef4444",
+    name: "Recon", icon: "🎯", spriteId: "recon", color: "#ef4444",
     desc: "Precision killer. Marks targets, exploits weaknesses, strikes lethally.",
     baseStats: { hp: 65, armor: 4, shield: 8, damage: 24, speed: 17, crit: 20, evasion: 16 },
+    abilities: [
+      { id: "assassinate", name: "Assassinate", cost: 25, desc: "2x damage, +30% crit", unlockSkill: "Lethal Edge", targetType: "enemy", effectType: "attack", effect: { damageMultiplier: 2.0, critBonus: 30 } },
+      { id: "smokeBomb", name: "Smoke Bomb", cost: 15, desc: "+40% evasion for 2 rounds", unlockSkill: "Shadowstep", targetType: "self", effectType: "buff", effect: { stat: "evasion", modifier: 40, duration: 2 } },
+      { id: "doubleStrike", name: "Double Strike", cost: 20, desc: "Two hits at 70% damage", unlockSkill: "Phantom Strike", targetType: "enemy", effectType: "attack", effect: { hits: 2, damageMultiplier: 0.7 } },
+      { id: "markTarget", name: "Mark Target", cost: 10, desc: "Target takes +30% damage for 2 rounds", unlockSkill: "Mark for Death", targetType: "enemy", effectType: "debuff", effect: { stat: "damageTaken", modifier: 0.3, duration: 2 } },
+    ],
     branches: {
       ASSASSIN: {
         name: "Assassin", desc: "Single-target annihilator",
@@ -58,9 +70,15 @@ export const CLASSES = {
     }
   },
   ENGINEER: {
-    name: "Engineer", icon: "⚙️", color: "#f59e0b",
+    name: "Engineer", icon: "⚙️", spriteId: "engineer", color: "#f59e0b",
     desc: "Tech controller. Deploys systems, hacks enemies, controls the field.",
     baseStats: { hp: 85, armor: 10, shield: 18, damage: 14, speed: 10, crit: 5, evasion: 4 },
+    abilities: [
+      { id: "deployTurret", name: "Deploy Turret", cost: 20, desc: "Turret auto-fires for 3 rounds", unlockSkill: "Deploy Turret", targetType: "self", effectType: "buff", effect: { stat: "turretActive", duration: 3, turretDmg: 15 } },
+      { id: "empBlast", name: "EMP Blast", cost: 25, desc: "Stun all enemies for 1 round", unlockSkill: "EMP Pulse", targetType: "allEnemies", effectType: "debuff", effect: { stat: "stunned", duration: 1 } },
+      { id: "armorShred", name: "Armor Shred", cost: 15, desc: "Reduce target's armor by 40% for 3 rounds", unlockSkill: "Hack Systems", targetType: "enemy", effectType: "debuff", effect: { stat: "armor", modifier: -0.4, duration: 3 } },
+      { id: "orbitalStrike", name: "Orbital Strike", cost: 30, desc: "Heavy AoE damage to all enemies", unlockSkill: "Orbital Uplink", targetType: "allEnemies", effectType: "attack", effect: { aoeDamage: 45 } },
+    ],
     branches: {
       TURRET_MASTER: {
         name: "Machinist", desc: "Automated war machines",
@@ -87,9 +105,15 @@ export const CLASSES = {
     }
   },
   MEDIC: {
-    name: "Medic", icon: "💉", color: "#22c55e",
+    name: "Medic", icon: "💉", spriteId: "medic", color: "#22c55e",
     desc: "Combat lifeline. Heals, revives, cleanses, and keeps everyone fighting.",
     baseStats: { hp: 90, armor: 8, shield: 15, damage: 8, speed: 13, crit: 3, evasion: 6 },
+    abilities: [
+      { id: "heal", name: "Heal", cost: 15, desc: "Heal one ally for 40% max HP", unlockSkill: "Triage", targetType: "ally", effectType: "heal", effect: { healPercent: 0.4 } },
+      { id: "revive", name: "Revive", cost: 30, desc: "Revive downed ally at 30% HP (1/encounter)", unlockSkill: "Resuscitate", targetType: "ally", effectType: "revive", effect: { revivePercent: 0.3 } },
+      { id: "auraBoost", name: "Aura Boost", cost: 20, desc: "+15% damage to all allies for 3 rounds", unlockSkill: "Adrenaline Shot", targetType: "allAllies", effectType: "buff", effect: { stat: "damage", modifier: 0.15, duration: 3 } },
+      { id: "purge", name: "Purge", cost: 12, desc: "Remove all debuffs from one ally", unlockSkill: "Purge Toxins", targetType: "ally", effectType: "cleanse", effect: {} },
+    ],
     branches: {
       FIELD_SURGEON: {
         name: "Field Surgeon", desc: "Dedicated healer",

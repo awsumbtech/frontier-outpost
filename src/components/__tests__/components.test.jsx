@@ -2,9 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import ClassBadge from '../shared/ClassBadge';
 import StatDiff from '../shared/StatDiff';
-import CombatAlly from '../combat/CombatAlly';
-import CombatEnemy from '../combat/CombatEnemy';
-import { createOperative } from '../../engine/operatives';
+import UnitTile from '../combat/UnitTile';
+import { createOperative, getEffectiveStats } from '../../engine/operatives';
 
 describe('ClassBadge', () => {
   it('renders ANY for null classKey', () => {
@@ -62,40 +61,58 @@ describe('StatDiff', () => {
   });
 });
 
-describe('CombatAlly', () => {
-  it('renders operative name and stats', () => {
+describe('UnitTile (ally)', () => {
+  it('renders operative name and level', () => {
     const op = createOperative('VANGUARD', 'Test Tank');
-    const { container } = render(<CombatAlly op={op} />);
+    const stats = getEffectiveStats(op);
+    const { container } = render(<UnitTile unit={op} isAlly stats={stats} />);
     expect(container.textContent).toContain('Test');
     expect(container.textContent).toContain('L1');
   });
 
-  it('shows dead class when not alive', () => {
+  it('shows dead overlay when not alive', () => {
     const op = createOperative('RECON', 'Dead Scout');
     op.alive = false;
-    const { container } = render(<CombatAlly op={op} />);
-    expect(container.querySelector('.dead')).toBeTruthy();
+    const stats = getEffectiveStats(op);
+    const { container } = render(<UnitTile unit={op} isAlly stats={stats} />);
+    expect(container.querySelector('.unit-dead')).toBeTruthy();
+    expect(container.querySelector('.unit-tile-dead-overlay')).toBeTruthy();
   });
 
   it('shows HP bar', () => {
     const op = createOperative('MEDIC', 'Healer');
-    const { container } = render(<CombatAlly op={op} />);
+    const stats = getEffectiveStats(op);
+    const { container } = render(<UnitTile unit={op} isAlly stats={stats} />);
     expect(container.querySelector('.bar-fill')).toBeTruthy();
-    expect(container.textContent).toContain(`${op.currentHp}/`);
+  });
+
+  it('shows DEF status when defending', () => {
+    const op = createOperative('VANGUARD', 'Tank');
+    op.defending = true;
+    const stats = getEffectiveStats(op);
+    const { container } = render(<UnitTile unit={op} isAlly stats={stats} defending />);
+    expect(container.textContent).toContain('DEF');
+    expect(container.querySelector('.unit-defending')).toBeTruthy();
   });
 });
 
-describe('CombatEnemy', () => {
-  it('renders enemy name and HP', () => {
-    const enemy = { name: 'Test Bot', hp: 50, maxHp: 100, damage: 10, armor: 5, speed: 8, stunned: false };
-    const { container } = render(<CombatEnemy e={enemy} />);
+describe('UnitTile (enemy)', () => {
+  it('renders enemy name and HP bar', () => {
+    const enemy = { id: 'e1', name: 'Test Bot', hp: 50, maxHp: 100, damage: 10, armor: 5, speed: 8, alive: true, stunned: false };
+    const { container } = render(<UnitTile unit={enemy} isAlly={false} />);
     expect(container.textContent).toContain('Test Bot');
-    expect(container.textContent).toContain('50/100');
+    expect(container.querySelector('.bar-fill')).toBeTruthy();
   });
 
-  it('shows STN badge when stunned', () => {
-    const enemy = { name: 'Stunned Bot', hp: 50, maxHp: 100, damage: 10, armor: 5, speed: 8, stunned: true };
-    const { container } = render(<CombatEnemy e={enemy} />);
-    expect(container.textContent).toContain('STUNNED');
+  it('shows STUN status when stunned', () => {
+    const enemy = { id: 'e2', name: 'Stunned Bot', hp: 50, maxHp: 100, damage: 10, armor: 5, speed: 8, alive: true, stunned: true };
+    const { container } = render(<UnitTile unit={enemy} isAlly={false} />);
+    expect(container.textContent).toContain('STUN');
+  });
+
+  it('applies selectable class when selectable', () => {
+    const enemy = { id: 'e3', name: 'Target', hp: 50, maxHp: 100, damage: 10, armor: 5, speed: 8, alive: true, stunned: false };
+    const { container } = render(<UnitTile unit={enemy} isAlly={false} selectable onClick={() => {}} />);
+    expect(container.querySelector('.unit-selectable')).toBeTruthy();
   });
 });

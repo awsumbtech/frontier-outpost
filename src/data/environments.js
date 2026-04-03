@@ -24,6 +24,30 @@ export const ENVIRONMENTS = [
     atmosphere: ["wind-dust", "distant-lightning"],
     description: "The ridge rises sharply above the treeline, exposed rock veined with faintly glowing mineral deposits. The wind is constant up here, carrying copper-tinged dust from the plains below. The crimson forest stretches to the horizon in every direction. Movement flickers between the boulders — too coordinated to be random."
   },
+  {
+    id: "perimeter_sweep",
+    name: "Outpost Perimeter",
+    cssClass: "env-perimeter-sweep",
+    backgroundImage: "/environments/crimson-clearing.png",
+    atmosphere: ["wind-dust", "red-ambient"],
+    description: "The patrol route traces the outpost's outer fence line. Sensor posts mark each waypoint, their status lights flickering between green and amber. The crimson forest presses close, branches scraping against the chain-link in the wind. Footprints in the soil — not human, not old — cross the path at irregular intervals."
+  },
+  {
+    id: "patrol_corridor",
+    name: "Ridge Patrol Route",
+    cssClass: "env-patrol-corridor",
+    backgroundImage: "/environments/eastern-ridge.png",
+    atmosphere: ["wind-dust", "distant-lightning"],
+    description: "A narrow trail carved along the ridgeline, marked with reflective survey stakes. The path winds between boulder formations, offering limited visibility around each bend. Mineral deposits in the rock cast faint, shifting light. Something has been following the patrol markers — learning the route."
+  },
+  {
+    id: "outpost_perimeter",
+    name: "Colony Defense Ring",
+    cssClass: "env-outpost-perimeter",
+    backgroundImage: "/environments/colony-perimeter.png",
+    atmosphere: ["smoke-wisps", "emergency-lights"],
+    description: "The outer defense ring circles the colony's vital structures — power generators, water recyclers, the med bay. Sandbag emplacements and makeshift barricades line the route. Floodlights sweep in overlapping arcs, but the gaps between them grow wider as bulbs burn out faster than they can be replaced."
+  },
   // CH2: Strange Signals
   {
     id: "underground_tunnels",

@@ -1,14 +1,16 @@
 import { CLASSES } from '../data/classes';
+import { CLASS_BASE_RESOURCE } from '../data/constants';
 import { uid } from './utils';
 
 export function createOperative(classKey, name, traits = []) {
   const cls = CLASSES[classKey];
   return {
-    id: uid(), name, classKey, className: cls.name, icon: cls.icon, color: cls.color,
+    id: uid(), name, classKey, className: cls.name, icon: cls.icon, spriteId: classKey.toLowerCase(), color: cls.color,
     level: 1, xp: 0, xpToLevel: 100, skillPoints: 1,
     baseStats: { ...cls.baseStats },
     gear: { weapon: null, armor: null, implant: null, gadget: null },
     skills: {}, alive: true, currentHp: cls.baseStats.hp, currentShield: cls.baseStats.shield,
+    currentResource: CLASS_BASE_RESOURCE[classKey],
     traits,
   };
 }

@@ -1,9 +1,9 @@
 export const STIM_TYPES = [
-  { id: "health_stim", name: "Health Stim", icon: "💚", desc: "Restore 40% HP to one ally", color: "#2ed573", cost: 30 },
-  { id: "shield_cell", name: "Shield Cell", icon: "🔷", desc: "Restore 100% shield to one ally", color: "#00d4ff", cost: 25 },
-  { id: "adrenaline", name: "Adrenaline Injector", icon: "⚡", desc: "One ally gets +50% damage for 3 rounds", color: "#ffa502", cost: 40 },
-  { id: "nano_kit", name: "Nano Repair Kit", icon: "🔧", desc: "Heal entire squad for 25% HP", color: "#2ed573", cost: 50 },
-  { id: "purge_shot", name: "Purge Shot", icon: "✨", desc: "Remove all debuffs, +10% evasion for 2 rounds", color: "#c084fc", cost: 35 },
+  { id: "health_stim", name: "Health Stim", icon: "💚", spriteId: "health_stim", desc: "Restore 40% HP to one ally", color: "#2ed573", cost: 30 },
+  { id: "shield_cell", name: "Shield Cell", icon: "🔷", spriteId: "shield_cell", desc: "Restore 100% shield to one ally", color: "#00d4ff", cost: 25 },
+  { id: "adrenaline", name: "Adrenaline Injector", icon: "⚡", spriteId: "adrenaline", desc: "One ally gets +50% damage for 3 rounds", color: "#ffa502", cost: 40 },
+  { id: "nano_kit", name: "Nano Repair Kit", icon: "🔧", spriteId: "nano_kit", desc: "Heal entire squad for 25% HP", color: "#2ed573", cost: 50 },
+  { id: "purge_shot", name: "Purge Shot", icon: "✨", spriteId: "purge_shot", desc: "Remove all debuffs, +10% evasion for 2 rounds", color: "#c084fc", cost: 35 },
 ];
 
 export const WEAPON_NAMES = {

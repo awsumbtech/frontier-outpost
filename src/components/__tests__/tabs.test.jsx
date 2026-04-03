@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+
+// Mock PhaserGame to avoid Phaser canvas detection crashing in jsdom
+vi.mock('../../phaser/PhaserGame', () => ({
+  default: () => null,
+}));
+
 import SquadTab from '../tabs/SquadTab';
 import MissionTab from '../tabs/MissionTab';
 import InventoryTab from '../tabs/InventoryTab';
@@ -64,7 +70,7 @@ describe('MissionTab', () => {
   it('renders mission select when no active mission', () => {
     const game = makeGame();
     const { container } = render(
-      <MissionTab game={game} mission={null} combatLog={[]} decision={null} missionResult={null} logRef={{ current: null }} animation={null} skipAnimation={vi.fn()} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} />
+      <MissionTab game={game} mission={null} combatLog={[]} decision={null} missionResult={null} logRef={{ current: null }} turnState={null} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} selectAttack={vi.fn()} selectDefend={vi.fn()} selectItem={vi.fn()} chooseStim={vi.fn()} chooseTarget={vi.fn()} cancelSelection={vi.fn()} />
     );
     expect(container.textContent).toContain('Avg Level');
     expect(container.textContent).toContain('0 completed');
@@ -86,11 +92,11 @@ describe('MissionTab', () => {
     };
     const log = [{ text: 'Round 1', type: 'round' }];
     const { container } = render(
-      <MissionTab game={game} mission={mission} combatLog={log} decision={null} missionResult={null} logRef={{ current: null }} animation={null} skipAnimation={vi.fn()} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} />
+      <MissionTab game={game} mission={mission} combatLog={log} decision={null} missionResult={null} logRef={{ current: null }} turnState={null} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} selectAttack={vi.fn()} selectDefend={vi.fn()} selectItem={vi.fn()} chooseStim={vi.fn()} chooseTarget={vi.fn()} cancelSelection={vi.fn()} />
     );
-    expect(container.textContent).toContain(MISSIONS[0].name);
-    expect(container.textContent).toContain('1/3');
-    expect(container.textContent).toContain('Next Round');
+    // Combat view should render enemy and squad info
+    expect(container.textContent).toContain('Test Bot');
+    expect(container.textContent).toContain('Round 1');
   });
 
   it('renders debrief panel on result phase', () => {
@@ -109,7 +115,7 @@ describe('MissionTab', () => {
     const result = { success: true, xp: 100, credits: 50, loot: [], combatStats: mission.combatStats, newBeats: [] };
     const advanceDebrief = vi.fn();
     const { container } = render(
-      <MissionTab game={game} mission={mission} combatLog={[]} decision={null} missionResult={result} logRef={{ current: null }} animation={null} skipAnimation={vi.fn()} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={advanceDebrief} />
+      <MissionTab game={game} mission={mission} combatLog={[]} decision={null} missionResult={result} logRef={{ current: null }} turnState={null} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={advanceDebrief} selectAttack={vi.fn()} selectDefend={vi.fn()} selectItem={vi.fn()} chooseStim={vi.fn()} chooseTarget={vi.fn()} cancelSelection={vi.fn()} />
     );
     expect(container.textContent).toContain('MISSION COMPLETE');
     expect(container.textContent).toContain('5'); // rounds
@@ -137,7 +143,7 @@ describe('MissionTab', () => {
     };
     const result = { success: true, xp: 100, credits: 50, loot: [], combatStats: mission.combatStats, newBeats: [{ sender: 'CMD Vasquez', text: 'Good work on the sweep.', chapterId: 'ch1', at: 1 }] };
     const { container } = render(
-      <MissionTab game={game} mission={mission} combatLog={[]} decision={null} missionResult={result} logRef={{ current: null }} animation={null} skipAnimation={vi.fn()} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} />
+      <MissionTab game={game} mission={mission} combatLog={[]} decision={null} missionResult={result} logRef={{ current: null }} turnState={null} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} selectAttack={vi.fn()} selectDefend={vi.fn()} selectItem={vi.fn()} chooseStim={vi.fn()} chooseTarget={vi.fn()} cancelSelection={vi.fn()} />
     );
     expect(container.textContent).toContain('INCOMING TRANSMISSION');
     expect(container.textContent).toContain('CMD Vasquez');
@@ -152,7 +158,7 @@ describe('InventoryTab', () => {
     const { container } = render(
       <InventoryTab game={game} invFilter="all" setInvFilter={vi.fn()} stimTarget={null} setStimTarget={vi.fn()} buyStim={vi.fn()} useStim={vi.fn()} scrapGear={vi.fn()} />
     );
-    expect(container.textContent).toContain('COMBAT STIMS');
+    expect(container.textContent).toContain('CONSUMABLES');
     expect(container.textContent).toContain('GEAR LOCKER');
     expect(container.textContent).toContain('2 ITEMS');
   });
