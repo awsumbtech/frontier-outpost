@@ -54,6 +54,62 @@ export const GENERATOR_PROFILES = {
     },
   },
 
+  // ── Circuit: Patrol / Perimeter environments ──
+  patrol_corridor: {
+    archetype: "circuit",
+    width: 35,
+    height: 28,
+    params: {
+      pathWidth: 3,
+      shortcuts: 2,
+      alcoves: 3,
+      interiorDetail: 0.3,
+      encounterZonePercent: 0.15,
+      encounterZoneClustering: 0.7,
+      obstaclePercent: 0.03,
+    },
+    palette: {
+      floor: "#2a2a3a", wall: "#0f0f1a", obstacle: "#3a3a4a",
+      encounterZone: "#4a2020", ambient: "#1a1a2e",
+    },
+  },
+  outpost_perimeter: {
+    archetype: "circuit",
+    width: 42,
+    height: 34,
+    params: {
+      pathWidth: 4,
+      shortcuts: 1,
+      alcoves: 4,
+      interiorDetail: 0.2,
+      encounterZonePercent: 0.18,
+      encounterZoneClustering: 0.65,
+      obstaclePercent: 0.04,
+    },
+    palette: {
+      floor: "#252830", wall: "#101218", obstacle: "#383c48",
+      encounterZone: "#3a2828", ambient: "#2244aa10",
+    },
+  },
+  perimeter_sweep: {
+    archetype: "circuit",
+    width: 38,
+    height: 30,
+    params: {
+      pathWidth: 3,
+      shortcuts: 3,
+      alcoves: 2,
+      interiorDetail: 0.4,
+      encounterZonePercent: 0.14,
+      encounterZoneClustering: 0.6,
+      obstaclePercent: 0.05,
+    },
+    palette: {
+      floor: "#1e2830", wall: "#0c1018", obstacle: "#2e3c44",
+      encounterZone: "#2a1e20", ambient: "#223344",
+    },
+  },
+
   // ── CH2: Strange Signals (cavern + grid) ──
   underground_tunnels: {
     archetype: "cavern",

@@ -2,6 +2,7 @@ import { createRng } from "./seededRandom";
 import { generateOrganic } from "./generators/organic";
 import { generateGrid } from "./generators/grid";
 import { generateCavern } from "./generators/cavern";
+import { generateCircuit } from "./generators/circuit";
 import { postprocess } from "./postprocess";
 import { TILE_SIZE } from "../../data/mapConstants";
 import { GENERATOR_PROFILES } from "../../data/mapGeneratorProfiles";
@@ -10,6 +11,7 @@ const GENERATORS = {
   organic: generateOrganic,
   grid: generateGrid,
   cavern: generateCavern,
+  circuit: generateCircuit,
 };
 
 const MAX_RETRIES = 3;

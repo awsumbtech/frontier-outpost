@@ -22,8 +22,8 @@ export const MAP_MAX_W = 50;
 export const MAP_MAX_H = 40;
 
 // Encounter defaults
-export const ENCOUNTER_BASE_RATE = 0.08;
-export const ENCOUNTER_ZONE_RATE = 0.25;
-export const ENCOUNTER_COOLDOWN = 4;       // min steps between encounters
-export const ENCOUNTER_ESCALATION = 0.03;  // +3% per step after cooldown
-export const ENCOUNTER_MAX_RATE = 0.95;
+export const ENCOUNTER_BASE_RATE = 0.05;
+export const ENCOUNTER_ZONE_RATE = 0.15;
+export const ENCOUNTER_COOLDOWN = 8;       // min steps between encounters
+export const ENCOUNTER_ESCALATION = 0.02;  // +2% per step after cooldown
+export const ENCOUNTER_MAX_RATE = 0.80;

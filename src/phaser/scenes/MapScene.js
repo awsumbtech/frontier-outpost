@@ -1,8 +1,9 @@
 import Phaser from "phaser";
-import { TILE, TILE_SIZE, TILE_WALKABLE } from "../../data/mapConstants";
+import { TILE, TILE_SIZE } from "../../data/mapConstants";
 import Player from "../entities/Player";
 import EncounterSystem from "../systems/EncounterSystem";
 import CameraSystem from "../systems/CameraSystem";
+import { generateTileset } from "../assets/tilesetGen";
 
 export default class MapScene extends Phaser.Scene {
   constructor() {
@@ -14,19 +15,24 @@ export default class MapScene extends Phaser.Scene {
     this.eventBridge = null;
     this.exitMarker = null;
     this.exitActive = false;
+    this.tilesetKey = null;
   }
 
   init(data) {
     this.mapData = data.mapData;
     this.eventBridge = data.eventBridge;
     this.playerStartPos = data.playerPos || null;
+    this.squadLeaderClass = (data.mapData && data.mapData.squadLeaderClass) || 'vanguard';
   }
 
   create() {
     const { terrain, palette, width, height, entities, encounterConfig, seed } = this.mapData;
 
-    // Render tilemap as colored rectangles
-    this.renderTilemap(terrain, palette, width, height);
+    // Generate tileset texture and render tilemap as sprites
+    const paletteId = this.mapData.id || "default";
+    generateTileset(this, palette, paletteId);
+    this.tilesetKey = `tileset-${paletteId}`;
+    this.renderTilemap(terrain, width, height);
 
     // Render exit marker
     const exitEntity = entities.find(e => e.type === "exit");
@@ -47,15 +53,16 @@ export default class MapScene extends Phaser.Scene {
         yoyo: true,
         repeat: -1,
       });
-      // Start dim/inactive until encounters are done
-      this.exitMarker.setVisible(false);
+      // Exit is always visible — encounters are incidental, not required
+      this.exitMarker.setVisible(true);
+      this.exitActive = true;
     }
 
     // Create player at spawn or saved position
     const spawnEntity = entities.find(e => e.type === "spawn");
     const startX = this.playerStartPos?.x ?? spawnEntity?.x ?? 1;
     const startY = this.playerStartPos?.y ?? spawnEntity?.y ?? 1;
-    this.player = new Player(this, startX, startY, terrain);
+    this.player = new Player(this, startX, startY, terrain, this.squadLeaderClass || "vanguard");
 
     // Camera follows player
     this.cameraSystem = new CameraSystem(this, width, height);
@@ -88,83 +95,29 @@ export default class MapScene extends Phaser.Scene {
     });
   }
 
-  renderTilemap(terrain, palette, width, height) {
-    const graphics = this.add.graphics();
-    graphics.setDepth(0);
-
+  renderTilemap(terrain, width, height) {
     for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const tile = terrain[y][x];
-        let color;
-        switch (tile) {
-          case TILE.VOID:
-            color = 0x0a0a0a;
-            break;
-          case TILE.FLOOR:
-          case TILE.SPAWN:
-            color = Phaser.Display.Color.HexStringToColor(palette.floor).color;
-            break;
-          case TILE.WALL:
-            color = Phaser.Display.Color.HexStringToColor(palette.wall).color;
-            break;
-          case TILE.OBSTACLE:
-            color = Phaser.Display.Color.HexStringToColor(palette.obstacle).color;
-            break;
-          case TILE.ENCOUNTER_ZONE:
-            color = Phaser.Display.Color.HexStringToColor(palette.encounterZone).color;
-            break;
-          case TILE.EXIT:
-            color = Phaser.Display.Color.HexStringToColor(palette.floor).color;
-            break;
-          default:
-            color = 0x0a0a0a;
-        }
-        graphics.fillStyle(color, 1);
-        graphics.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-
-        // Subtle grid lines for visual clarity
-        if (TILE_WALKABLE.has(tile)) {
-          graphics.lineStyle(1, 0xffffff, 0.03);
-          graphics.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-        }
-      }
-    }
-
-    // Draw obstacle shapes (small inner rectangles to differentiate from walls)
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (terrain[y][x] === TILE.OBSTACLE) {
-          const oColor = Phaser.Display.Color.HexStringToColor(palette.obstacle).color;
-          graphics.fillStyle(oColor, 1);
-          const inset = 4;
-          graphics.fillRect(
-            x * TILE_SIZE + inset, y * TILE_SIZE + inset,
-            TILE_SIZE - inset * 2, TILE_SIZE - inset * 2
-          );
-          graphics.lineStyle(1, 0xffffff, 0.08);
-          graphics.strokeRect(
-            x * TILE_SIZE + inset, y * TILE_SIZE + inset,
-            TILE_SIZE - inset * 2, TILE_SIZE - inset * 2
-          );
-        }
+      for (let x = 0; x < terrain[y].length; x++) {
+        const tileType = terrain[y][x];
+        const sprite = this.add.sprite(
+          x * TILE_SIZE + TILE_SIZE / 2,
+          y * TILE_SIZE + TILE_SIZE / 2,
+          this.tilesetKey,
+          tileType  // frame index matches TILE constant
+        );
+        sprite.setDepth(0);
       }
     }
   }
 
   onPlayerStep(data) {
-    // Check for exit tile
-    if (data.tile === TILE.EXIT && this.encounterSystem.isComplete()) {
+    // Check for exit tile — exit is always active
+    if (data.tile === TILE.EXIT) {
       this.eventBridge.emit("map:exit", {
         stepsTotal: data.stepCount,
         encounterState: this.encounterSystem.getState(),
       });
       return;
-    }
-
-    // Update exit marker visibility
-    if (this.exitMarker && this.encounterSystem.isComplete() && !this.exitActive) {
-      this.exitActive = true;
-      this.exitMarker.setVisible(true);
     }
 
     // Check for random encounter
@@ -196,11 +149,7 @@ export default class MapScene extends Phaser.Scene {
     if (this.player) {
       this.player.moving = false;
     }
-    // Update exit visibility after encounter
-    if (this.exitMarker && this.encounterSystem.isComplete() && !this.exitActive) {
-      this.exitActive = true;
-      this.exitMarker.setVisible(true);
-    }
+    // Exit is always visible — no gating on encounters
   }
 
   update() {

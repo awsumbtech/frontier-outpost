@@ -1,35 +1,37 @@
 import Phaser from "phaser";
 import { TILE_SIZE, TILE_WALKABLE } from "../../data/mapConstants";
+import { generatePlayerSprite } from "../assets/spriteGen";
 
 const MOVE_SPEED = 160; // pixels per second
 const TILE_MOVE_TIME = (TILE_SIZE / MOVE_SPEED) * 1000; // ms per tile
 
 // Player entity — grid-based movement with smooth tweening.
 export default class Player {
-  constructor(scene, tileX, tileY, terrain) {
+  constructor(scene, tileX, tileY, terrain, classId = "vanguard") {
     this.scene = scene;
     this.terrain = terrain;
     this.tileX = tileX;
     this.tileY = tileY;
     this.moving = false;
     this.stepCount = 0;
-    this.facingDir = "down";
+    this.facing = "down";
+    this.classId = classId;
 
-    // Create a simple colored rectangle as the player sprite (v1: no sprite sheets)
+    // Generate sprite texture (idempotent — safe to call every time)
+    generatePlayerSprite(scene, classId);
+    const textureKey = `player-${classId}`;
+
+    // Create animated sprite at player tile position
     const px = tileX * TILE_SIZE + TILE_SIZE / 2;
     const py = tileY * TILE_SIZE + TILE_SIZE / 2;
-
-    this.sprite = scene.add.container(px, py);
-
-    // Body: cyan square
-    const body = scene.add.rectangle(0, 0, TILE_SIZE - 4, TILE_SIZE - 4, 0x00d4ff);
-    body.setStrokeStyle(1, 0x00aacc);
-
-    // Direction indicator: small triangle showing facing direction
-    this.dirIndicator = scene.add.triangle(0, -8, 0, -4, -4, 2, 4, 2, 0x00ffff);
-
-    this.sprite.add([body, this.dirIndicator]);
+    this.sprite = scene.add.sprite(px, py, textureKey, 0);
     this.sprite.setDepth(10);
+
+    // Define animations (keyed by classId to avoid conflicts between classes)
+    this._createAnimations(textureKey);
+
+    // Start in idle-down pose
+    this.sprite.play(`${classId}-idle-down`);
 
     // Set up keyboard input
     this.cursors = scene.input.keyboard.createCursorKeys();
@@ -41,15 +43,41 @@ export default class Player {
     });
   }
 
+  _createAnimations(textureKey) {
+    const { classId } = this;
+    const anims = this.scene.anims;
+
+    const defs = [
+      { key: `${classId}-walk-down`,  frames: [0, 1, 2, 1], frameRate: 8, repeat: -1 },
+      { key: `${classId}-walk-left`,  frames: [3, 4, 5, 4], frameRate: 8, repeat: -1 },
+      { key: `${classId}-walk-right`, frames: [6, 7, 8, 7], frameRate: 8, repeat: -1 },
+      { key: `${classId}-walk-up`,    frames: [9, 10, 11, 10], frameRate: 8, repeat: -1 },
+      { key: `${classId}-idle-down`,  frames: [0],  frameRate: 1, repeat: 0 },
+      { key: `${classId}-idle-left`,  frames: [3],  frameRate: 1, repeat: 0 },
+      { key: `${classId}-idle-right`, frames: [6],  frameRate: 1, repeat: 0 },
+      { key: `${classId}-idle-up`,    frames: [9],  frameRate: 1, repeat: 0 },
+    ];
+
+    for (const def of defs) {
+      if (anims.exists(def.key)) continue;
+      anims.create({
+        key: def.key,
+        frames: def.frames.map(f => ({ key: textureKey, frame: f })),
+        frameRate: def.frameRate,
+        repeat: def.repeat,
+      });
+    }
+  }
+
   update() {
     if (this.moving) return;
 
     let dx = 0, dy = 0;
 
-    if (this.cursors.up.isDown || this.wasd.w.isDown) { dy = -1; this.facingDir = "up"; }
-    else if (this.cursors.down.isDown || this.wasd.s.isDown) { dy = 1; this.facingDir = "down"; }
-    else if (this.cursors.left.isDown || this.wasd.a.isDown) { dx = -1; this.facingDir = "left"; }
-    else if (this.cursors.right.isDown || this.wasd.d.isDown) { dx = 1; this.facingDir = "right"; }
+    if (this.cursors.up.isDown || this.wasd.w.isDown) { dy = -1; this.facing = "up"; }
+    else if (this.cursors.down.isDown || this.wasd.s.isDown) { dy = 1; this.facing = "down"; }
+    else if (this.cursors.left.isDown || this.wasd.a.isDown) { dx = -1; this.facing = "left"; }
+    else if (this.cursors.right.isDown || this.wasd.d.isDown) { dx = 1; this.facing = "right"; }
 
     if (dx === 0 && dy === 0) return;
 
@@ -61,8 +89,8 @@ export default class Player {
     if (newX < 0 || newX >= this.terrain[0].length) return;
     if (!TILE_WALKABLE.has(this.terrain[newY][newX])) return;
 
-    // Update direction indicator
-    this.updateDirectionIndicator();
+    // Start walk animation for the current facing direction
+    this.sprite.play(`${this.classId}-walk-${this.facing}`);
 
     // Move
     this.moving = true;
@@ -81,6 +109,8 @@ export default class Player {
       ease: "Linear",
       onComplete: () => {
         this.moving = false;
+        // Return to idle pose for current facing direction
+        this.sprite.play(`${this.classId}-idle-${this.facing}`);
         // Emit step event for encounter checking
         this.scene.events.emit("player:step", {
           x: this.tileX,
@@ -90,27 +120,6 @@ export default class Player {
         });
       },
     });
-  }
-
-  updateDirectionIndicator() {
-    switch (this.facingDir) {
-      case "up":
-        this.dirIndicator.setPosition(0, -8);
-        this.dirIndicator.setAngle(0);
-        break;
-      case "down":
-        this.dirIndicator.setPosition(0, 8);
-        this.dirIndicator.setAngle(180);
-        break;
-      case "left":
-        this.dirIndicator.setPosition(-8, 0);
-        this.dirIndicator.setAngle(-90);
-        break;
-      case "right":
-        this.dirIndicator.setPosition(8, 0);
-        this.dirIndicator.setAngle(90);
-        break;
-    }
   }
 
   getPosition() {

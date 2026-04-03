@@ -1,7 +1,7 @@
 import { getEffectiveStats } from '../../engine/operatives';
 import UnitTile from './UnitTile';
 import TurnOrderBar from './TurnOrderBar';
-import MissionProgressDots from './MissionProgressDots';
+
 import CompactLog from './CompactLog';
 import ActionMenu from './ActionMenu';
 import PartyStatusPanel from './PartyStatusPanel';
@@ -53,7 +53,6 @@ export default function BattleScene({
         </>
       )}
       <TurnOrderBar squad={squad} enemies={enemies} highlightId={currentTurnId} />
-      <MissionProgressDots current={currentEncounter} total={totalEncounters} roundNum={roundNum} missionName={missionTypeName} />
 
       <div className="battle-field-area battle-field-ff">
         {/* Enemies on LEFT (FF style) */}

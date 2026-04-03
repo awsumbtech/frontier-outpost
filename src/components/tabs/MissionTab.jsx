@@ -131,8 +131,7 @@ export default function MissionTab({
         />
         {isExploring && (
           <div style={{ textAlign: "center", padding: "8px 0", fontSize: "var(--font-xs)", color: "var(--text2)", fontFamily: "'Share Tech Mono', monospace" }}>
-            WASD / Arrow keys to move · Encounters: {encounterInfo ? `${encounterInfo.triggered}/${encounterInfo.total}` : `0/${mission.totalEncounters}`}
-            {encounterInfo && encounterInfo.remaining <= 0 && <span style={{ color: "var(--warning)", marginLeft: 8 }}>▸ Find the exit</span>}
+            WASD / Arrow keys to move · Find the exit
           </div>
         )}
       </div>
@@ -267,7 +266,7 @@ export default function MissionTab({
           const isLast = (mission.commsIndex||0) >= beats.length-1;
           return <button className="btn btn-primary" style={{flex:1}} onClick={advanceDebrief}>{isLast?"Return to Base":"Next ▸"}</button>;
         })()}
-        {mission.phase!=="result"&&<button className="btn btn-danger" onClick={resetMission}>Abort</button>}
+        {mission.phase==="briefing"&&<button className="btn btn-danger" onClick={resetMission}>Abort</button>}
       </div>
     </div>
   </div>);

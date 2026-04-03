@@ -94,9 +94,9 @@ describe('MissionTab', () => {
     const { container } = render(
       <MissionTab game={game} mission={mission} combatLog={log} decision={null} missionResult={null} logRef={{ current: null }} turnState={null} startMission={vi.fn()} advanceMission={vi.fn()} handleDecision={vi.fn()} resetMission={vi.fn()} advanceDebrief={vi.fn()} selectAttack={vi.fn()} selectDefend={vi.fn()} selectItem={vi.fn()} chooseStim={vi.fn()} chooseTarget={vi.fn()} cancelSelection={vi.fn()} />
     );
-    expect(container.textContent).toContain(MISSIONS[0].name);
-    expect(container.textContent).toContain('1/3');
-    expect(container.textContent).toContain('Abort');
+    // Combat view should render enemy and squad info
+    expect(container.textContent).toContain('Test Bot');
+    expect(container.textContent).toContain('Round 1');
   });
 
   it('renders debrief panel on result phase', () => {

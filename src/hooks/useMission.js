@@ -622,6 +622,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
 
     // Generate exploration map
     const map = generateMapForMission(mt);
+    map.squadLeaderClass = game.squad[0]?.spriteId || 'vanguard';
     setMapData(map);
     const spawnEntity = map.entities.find(e => e.type === "spawn");
     setPlayerPos(spawnEntity ? { x: spawnEntity.x, y: spawnEntity.y } : null);
