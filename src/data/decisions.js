@@ -17,7 +17,7 @@ export const DECISION_EVENTS = [
   { title: "Injured Civilian", desc: "Wounded colonist requesting evac.", choices: [
     { text: "Rescue them", effect: "rescue", desc: "+XP bonus" },
     { text: "Mark for pickup", effect: "mark", desc: "Small XP" },
-    { text: "Move on", effect: "skip", desc: "No effect" },
+    { text: "Move on", effect: "moveOn", desc: "+15% resource recovery" },
   ]},
   { title: "Power Relay", desc: "Damaged power relay. Reroute it?", choices: [
     { text: "Overload offensively", effect: "overload", desc: "25 AoE next fight" },

@@ -14,6 +14,7 @@ import {
   executeAllyAttack,
   executeAllyDefend,
   executeItemUse,
+  executeGadgetUse,
   applyAllyPassives,
   executeEnemyTurn,
   applyRoundEndEffects,
@@ -95,7 +96,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
         const loot = Array.from({ length: rng(1, 2 + tm) }, () => generateGear(pick(["weapon","armor","implant","gadget"]), pick(CLASS_KEYS), game.squad[0]?.level || 1));
         const isFirstClear = !game.completedMissions?.[m.type.id];
         const repeatPenalty = isFirstClear ? 1 : 0.5;
-        const xp = Math.round(50 * m.type.xpMult * tm * repeatPenalty);
+        const xp = Math.round(50 * m.type.xpMult * tm * repeatPenalty * (1 + (m.xpBonus || 0)));
         const creds = Math.round(rng(30, 60) * tm * repeatPenalty);
         const prevMC = m.prevMissionsCompleted;
         const newMC = prevMC + (isFirstClear ? 1 : 0);
@@ -126,6 +127,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
   });
 
   function betweenEncounterHeal() {
+    const resourceRecoveryRate = 0.25 + (mission?.resourceRecoveryBonus || 0);
     setGame(prev => ({
       ...prev,
       squad: prev.squad.map(o => {
@@ -137,7 +139,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
           ...o,
           currentHp: Math.min(maxHp, o.currentHp + Math.round(maxHp * 0.15)),
           currentShield: Math.min(maxSh, o.currentShield + Math.round(maxSh * 0.25)),
-          currentResource: Math.min(maxResource, (o.currentResource || 0) + Math.round(maxResource * 0.25)),
+          currentResource: Math.min(maxResource, (o.currentResource || 0) + Math.round(maxResource * resourceRecoveryRate)),
         };
       })
     }));
@@ -174,11 +176,14 @@ export default function useMission(game, setGame, updateGame, setTab) {
     setCombatLog(p => [...p, { text: `Round ${rn}`, type: "round" }]);
 
     // Apply round-start effects (mines, orbital, decision effects)
-    const { squad: rsSquad, enemies: rsEnemies, log: rsLog } = applyRoundStartEffects(
+    const { squad: rsSquad, enemies: rsEnemies, log: rsLog, newStims } = applyRoundStartEffects(
       rn, currentSquad, currentMission.enemies, currentMission.decisionApplied || {}
     );
     if (rsLog.length > 0) setCombatLog(p => [...p, ...rsLog]);
     applySquadState(rsSquad);
+    if (newStims && newStims.length > 0) {
+      setGame(prev => ({ ...prev, stims: [...(prev.stims || []), ...newStims] }));
+    }
 
     // Build turn queue
     const queue = buildTurnQueue(rsSquad, rsEnemies);
@@ -337,6 +342,34 @@ export default function useMission(game, setGame, updateGame, setTab) {
 
   function selectAbility() {
     setTurnState(ts => ts ? { ...ts, subPhase: "selectAbility", selectedAction: "ability" } : ts);
+  }
+
+  function selectGadget() {
+    if (!turnState || turnState.subPhase !== 'awaitingAction') return;
+    const entry = turnState.turnQueue[turnState.turnIndex];
+    if (!entry) return;
+    const op = game.squad.find(o => o.id === entry.unitId);
+    if (!op) return;
+    const gadget = op.gear?.gadget;
+    if (!gadget || !gadget.stats || (gadget.uses || 0) <= 0) return;
+
+    // Execute gadget immediately (no target selection needed — effects are self/AoE)
+    const currentSquad = game.squad;
+    const currentEnemies = mission?.enemies || [];
+
+    const { squad: newSquad, enemies: newEnemies, log: gadgetLog } = executeGadgetUse(
+      entry.unitId, currentSquad, currentEnemies
+    );
+
+    if (gadgetLog.length > 0) setCombatLog(p => [...p, ...gadgetLog]);
+    applySquadState(newSquad);
+    applyEnemyState(newEnemies);
+    setLastAction({ type: 'gadget', attackerId: entry.unitId, logEntries: gadgetLog, isAlly: true });
+
+    // Advance to next turn
+    const nextTs = { ...turnState, turnIndex: turnState.turnIndex + 1, subPhase: "processing" };
+    setTurnState(nextTs);
+    setTimeout(() => advanceTurn(nextTs, newSquad, newEnemies), ANIM_DURATIONS.item + 50);
   }
 
   function chooseAbility(abilityId) {
@@ -687,6 +720,44 @@ export default function useMission(game, setGame, updateGame, setTab) {
     if (choice.effect === "shields") setGame(p => ({ ...p, squad: p.squad.map(o => o.alive ? { ...o, currentShield: o.currentShield + 25 } : o) }));
     if (choice.effect === "pushThrough") { setGame(p => ({ ...p, squad: p.squad.map(o => { if (!o.alive) return o; return { ...o, currentHp: Math.max(1, o.currentHp - Math.round(getEffectiveStats(o).hp * .15)) }; }) })); }
     if (choice.effect === "salvage") { const b = generateGear(pick(["weapon","armor"]), pick(CLASS_KEYS), (game.squad[0]?.level||1)+1); b.rarity = Math.max(RARITY.RARE, b.rarity); updateGame(g => ({ ...g, inventory: [...g.inventory, b] })); }
+    if (choice.effect === "carefulLoot") {
+      const bonus = generateGear(pick(["weapon","armor","implant"]), pick(CLASS_KEYS), game.squad[0]?.level || 1);
+      bonus.rarity = Math.max(RARITY.RARE, bonus.rarity);
+      updateGame(g => ({ ...g, inventory: [...g.inventory, bonus] }));
+    }
+    if (choice.effect === "quickLoot") {
+      if (Math.random() < 0.5) {
+        const loot1 = generateGear(pick(["weapon","armor","implant"]), pick(CLASS_KEYS), game.squad[0]?.level || 1);
+        const loot2 = generateGear(pick(["weapon","armor","implant"]), pick(CLASS_KEYS), game.squad[0]?.level || 1);
+        updateGame(g => ({ ...g, inventory: [...g.inventory, loot1, loot2] }));
+        setCombatLog(p => [...p, { text: `Found 2 items!`, type: "decision" }]);
+      } else {
+        setGame(p => ({ ...p, squad: p.squad.map(o => o.alive ? { ...o, currentHp: Math.max(1, o.currentHp - 10) } : o) }));
+        setCombatLog(p => [...p, { text: `Trap! Squad takes 10 damage!`, type: "decision" }]);
+      }
+    }
+    if (choice.effect === "rescue") {
+      setMission(m => m ? { ...m, xpBonus: (m.xpBonus || 0) + 0.5 } : m);
+    }
+    if (choice.effect === "mark") {
+      setMission(m => m ? { ...m, xpBonus: (m.xpBonus || 0) + 0.25 } : m);
+    }
+    if (choice.effect === "moveOn") {
+      setMission(m => m ? { ...m, resourceRecoveryBonus: 0.15 } : m);
+    }
+    if (choice.effect === "avoid") {
+      setCombatLog(p => [...p, { text: `Patrol avoided. Encounter skipped.`, type: "decision" }]);
+      updateGame(g => ({ ...g, decisionHistory: { ...(g.decisionHistory || {}), [choice.effect]: mission.type.id } }));
+      setMission(m => {
+        if (!m) return m;
+        return { ...m, phase: "exploration", roundNum: 0, decisionApplied: { ...(m.decisionApplied || {}), ...applied, avoid: true } };
+      });
+      setDecision(null);
+      setBanter(null);
+      barkBudgetRef.current = 2; recentBarksRef.current = [];
+      eventBridgeRef.current.emit("map:resume", { squad: game.squad });
+      return;
+    }
     setCombatLog(p => [...p, { text: `>> ${choice.text}`, type: "decision" }]);
     updateGame(g => ({ ...g, decisionHistory: { ...(g.decisionHistory || {}), [choice.effect]: mission.type.id } }));
     setDecision(null);
@@ -751,7 +822,7 @@ export default function useMission(game, setGame, updateGame, setTab) {
     mapData, playerPos, eventBridge: eventBridgeRef.current,
     startMission, advanceMission, handleDecision, resetMission, advanceDebrief,
     // Turn-based action handlers
-    selectAttack, selectDefend, selectItem,
+    selectAttack, selectDefend, selectItem, selectGadget,
     chooseStim, chooseTarget, cancelSelection,
     selectAbility, chooseAbility, chooseAllyTarget,
   };
