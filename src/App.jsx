@@ -32,9 +32,13 @@ export default function App() {
 
   const ms = useMission(game, setGame, updateGame, setTab);
   const { mission, combatLog, decision, missionResult, logRef,
-    animation, advanceAnimation, skipAnimation,
+    turnState, lastAction,
     banter, storyReactions,
-    startMission, advanceMission, handleDecision, resetMission, advanceDebrief } = ms;
+    mapData, playerPos, eventBridge,
+    startMission, advanceMission, handleDecision, resetMission, advanceDebrief,
+    selectAttack, selectDefend, selectItem,
+    chooseStim, chooseTarget, cancelSelection,
+    selectAbility, chooseAbility, chooseAllyTarget } = ms;
 
   useEffect(() => { loadGame(); }, [loadGame]);
 
@@ -56,7 +60,7 @@ export default function App() {
       })}</div>
       <div className="content" style={tab==="Mission"&&mission?{padding:6,display:"flex",flexDirection:"column"}:{}}>
         {tab==="Squad"&&<SquadTab game={game} selectedOp={selectedOp} setSelectedOp={setSelectedOp} setGearModal={setGearModal} unequipGear={unequipGear} learnSkill={learnSkill} dismissOp={dismissOp}/>}
-        {tab==="Mission"&&<MissionTab game={game} mission={mission} combatLog={combatLog} decision={decision} missionResult={missionResult} logRef={logRef} animation={animation} advanceAnimation={advanceAnimation} skipAnimation={skipAnimation} banter={banter} storyReactions={storyReactions} startMission={startMission} advanceMission={advanceMission} handleDecision={handleDecision} resetMission={resetMission} advanceDebrief={advanceDebrief}/>}
+        {tab==="Mission"&&<MissionTab game={game} mission={mission} combatLog={combatLog} decision={decision} missionResult={missionResult} logRef={logRef} turnState={turnState} banter={banter} storyReactions={storyReactions} mapData={mapData} playerPos={playerPos} eventBridge={eventBridge} startMission={startMission} advanceMission={advanceMission} handleDecision={handleDecision} resetMission={resetMission} advanceDebrief={advanceDebrief} selectAttack={selectAttack} selectDefend={selectDefend} selectItem={selectItem} chooseStim={chooseStim} chooseTarget={chooseTarget} cancelSelection={cancelSelection} selectAbility={selectAbility} chooseAbility={chooseAbility} chooseAllyTarget={chooseAllyTarget} lastAction={lastAction}/>}
         {tab==="Comms"&&<CommsTab game={game} updateGame={updateGame}/>}
         {tab==="Inventory"&&<InventoryTab game={game} invFilter={invFilter} setInvFilter={setInvFilter} stimTarget={stimTarget} setStimTarget={setStimTarget} buyStim={buyStim} useStim={useStim} scrapGear={scrapGear}/>}
         {tab==="Recruit"&&<RecruitTab game={game} recruitOp={recruitOp}/>}

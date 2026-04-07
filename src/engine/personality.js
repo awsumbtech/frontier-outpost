@@ -13,6 +13,7 @@ import {
 } from '../data/personality';
 
 import { INLINE_STORY, DECISION_ECHOES, ENV_FLAVOR } from '../data/inlineStory';
+import { computeReputation, getDominantReputation } from './reputation';
 
 import { pick, rng } from './utils';
 
@@ -225,6 +226,24 @@ export function selectDeathReaction(fallenOp, survivors) {
 // Surfaces echoes of past decisions when relevant to the current mission.
 // =============================================================================
 
+const REPUTATION_ECHOES = {
+  heroic: [
+    "CMD Vasquez: Word of your compassion has reached the colony. Civilians are volunteering for supply runs to your sector.",
+    "Dr. Osei: The rescued colonists are sharing intel freely. Your reputation precedes you.",
+    "Riley: Morale's high. People trust this squad.",
+  ],
+  ruthless: [
+    "CMD Vasquez: Some of the settlers are uneasy about your methods. But the perimeter holds. Results matter.",
+    "Dr. Osei: The creatures seem more aggressive near your patrol routes. They've learned to fear you — and fight harder.",
+    "Riley: The squad's efficient. Cold, but efficient.",
+  ],
+  tactical: [
+    "CMD Vasquez: Your intel reports are the most thorough I've seen. Command is taking notice.",
+    "Dr. Osei: Your tactical data is invaluable for my research. The patterns you're identifying are remarkable.",
+    "Riley: Every move calculated. The enemy can't adapt fast enough.",
+  ],
+};
+
 export function getDecisionEcho(missionId, decisionHistory) {
   const results = [];
 
@@ -242,6 +261,16 @@ export function getDecisionEcho(missionId, decisionHistory) {
     // Pick a random line from this echo.
     const rawLine = pick(echo.lines);
     results.push(parseSender(rawLine));
+  }
+
+  // Add a reputation-flavored echo if the player has a dominant reputation
+  const reputation = computeReputation(decisionHistory);
+  const dominant = getDominantReputation(reputation);
+  if (dominant && reputation[dominant] >= 3 && Math.random() < 0.4) {
+    const lines = REPUTATION_ECHOES[dominant];
+    if (lines && lines.length > 0) {
+      results.push(parseSender(pick(lines)));
+    }
   }
 
   return results;

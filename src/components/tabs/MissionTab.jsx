@@ -1,10 +1,42 @@
+import { useState, useEffect } from 'react';
 import { MISSIONS } from '../../data/missions';
 import { STORY_CHAPTERS } from '../../data/story';
 import { ENEMY_TEMPLATES } from '../../data/enemies';
-import { RARITY_NAMES, RARITY_COLORS } from '../../data/constants';
+import { RARITY_NAMES, RARITY_COLORS, REPUTATION_LABELS } from '../../data/constants';
+import { hasUnreadIntelForMission } from '../../engine/intel';
+import { computeReputation } from '../../engine/reputation';
 import BattleScene from '../combat/BattleScene';
+import PhaserGame from '../../phaser/PhaserGame';
 
-export default function MissionTab({ game, mission, combatLog, decision, missionResult, logRef, animation, advanceAnimation, skipAnimation, banter, storyReactions, startMission, advanceMission, handleDecision, resetMission, advanceDebrief }) {
+export default function MissionTab({
+  game, mission, combatLog, decision, missionResult, logRef, turnState,
+  banter, storyReactions,
+  mapData, playerPos, eventBridge,
+  startMission, advanceMission, handleDecision, resetMission, advanceDebrief,
+  selectAttack, selectDefend, selectItem, chooseStim, chooseTarget, cancelSelection,
+  selectAbility, chooseAbility, chooseAllyTarget,
+  lastAction,
+}) {
+  const [selectedChapter, setSelectedChapter] = useState(null);
+  const [encounterInfo, setEncounterInfo] = useState(null);
+
+  // Listen for step updates from Phaser to show live encounter info
+  useEffect(() => {
+    if (!eventBridge) return;
+    function onStep(data) {
+      setEncounterInfo(data.encounterState);
+    }
+    function onReady(data) {
+      setEncounterInfo(data.encounterState);
+    }
+    eventBridge.on("map:step", onStep);
+    eventBridge.on("map:ready", onReady);
+    return () => {
+      eventBridge.off("map:step", onStep);
+      eventBridge.off("map:ready", onReady);
+    };
+  }, [eventBridge]);
+
   if (!mission) {
     const avg = game.squad.length>0?Math.round(game.squad.reduce((s,o)=>s+o.level,0)/game.squad.length):1;
     const completed = game.completedMissions || {};
@@ -17,42 +49,62 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
       else break;
     }
 
+    // Default to first unlocked chapter if none selected
+    const activeChapter = selectedChapter || [...unlockedChapters].pop() || "ch1";
+    const activeCh = STORY_CHAPTERS.find(c => c.id === activeChapter);
+    const activeChMissions = MISSIONS.filter(m => m.chapter === activeChapter);
+    const isActiveUnlocked = unlockedChapters.has(activeChapter);
+
+    const rep = computeReputation(game.decisionHistory || {});
+    const hasRep = rep.heroic > 0 || rep.ruthless > 0 || rep.tactical > 0;
+
     return (<div>
-      <div style={{fontSize:"var(--font-xs)",color:"var(--text2)",marginBottom:8}}>Avg Level {avg} · {game.missionsCompleted} completed</div>
-      {chapterOrder.map(chId => {
-        const ch = STORY_CHAPTERS.find(c => c.id === chId);
-        if (!ch) return null;
-        const chMissions = MISSIONS.filter(m => m.chapter === chId);
-        const isUnlocked = unlockedChapters.has(chId);
-        const allDone = chMissions.every(m => completed[m.id]);
-        const doneCount = chMissions.filter(m => completed[m.id]).length;
+      <div style={{fontSize:"var(--font-xs)",color:"var(--text2)",marginBottom:8}}>
+        Avg Level {avg} · {game.missionsCompleted} completed
+        {hasRep && <span className="reputation-summary">
+          {Object.entries(rep).filter(([,v]) => v > 0).map(([axis, val]) => (
+            <span key={axis} className="rep-badge" style={{color: REPUTATION_LABELS[axis].color, borderColor: REPUTATION_LABELS[axis].color + '40'}}>
+              {REPUTATION_LABELS[axis].icon} {REPUTATION_LABELS[axis].name} {val}
+            </span>
+          ))}
+        </span>}
+      </div>
 
-        return (<div key={chId} style={{marginBottom:12}}>
-          <div style={{
-            display:"flex",alignItems:"center",gap:8,padding:"8px 12px",
-            background: isUnlocked ? (allDone ? "rgba(46,213,115,0.08)" : "rgba(0,212,255,0.06)") : "rgba(0,0,0,0.2)",
-            border: `1px solid ${allDone ? "rgba(46,213,115,0.3)" : isUnlocked ? "rgba(0,212,255,0.2)" : "var(--border)"}`,
-            borderRadius:8,marginBottom:6,
-            opacity: isUnlocked ? 1 : 0.45,minHeight:40
-          }}>
-            {allDone && <span style={{color:"var(--success)",fontSize:14}}>✓</span>}
-            {!allDone && isUnlocked && <span style={{color:"var(--accent)",fontSize:12}}>▸</span>}
-            {!isUnlocked && <span style={{color:"var(--text2)",fontSize:12}}>🔒</span>}
-            <span style={{fontWeight:700,fontSize:"var(--font-sm)",color:allDone?"var(--success)":isUnlocked?"var(--accent)":"var(--text2)",flex:1}}>{ch.title}</span>
-            <span style={{fontSize:"var(--font-xxs)",fontFamily:"'Share Tech Mono',monospace",color:"var(--text2)"}}>{doneCount}/{chMissions.length}</span>
-          </div>
+      <div className="chapter-tabs">
+        {chapterOrder.map((chId, ci) => {
+          const ch = STORY_CHAPTERS.find(c => c.id === chId);
+          if (!ch) return null;
+          const chMissions = MISSIONS.filter(m => m.chapter === chId);
+          const isUnlocked = unlockedChapters.has(chId);
+          const allDone = chMissions.every(m => completed[m.id]);
+          const doneCount = chMissions.filter(m => completed[m.id]).length;
+          const isActive = chId === activeChapter;
 
-          {isUnlocked && chMissions.map((mt, mi) => {
+          return (<button key={chId}
+            className={`chapter-tab${isActive?" active":""}${allDone?" chapter-done":""}${!isUnlocked?" chapter-locked":""}`}
+            onClick={() => isUnlocked && setSelectedChapter(chId)}
+            disabled={!isUnlocked}>
+            {allDone && <span>✓</span>}
+            {!isUnlocked && <span>🔒</span>}
+            <span>Ch.{ci+1}</span>
+            <span className="ch-progress">{doneCount}/{chMissions.length}</span>
+          </button>);
+        })}
+      </div>
+
+      {isActiveUnlocked ? (
+        <div className="mission-grid">
+          {activeChMissions.map((mt, mi) => {
             const isDone = !!completed[mt.id];
             const timesCleared = completed[mt.id] || 0;
-            const prevDone = mi === 0 || !!completed[chMissions[mi - 1].id];
+            const prevDone = mi === 0 || !!completed[activeChMissions[mi - 1].id];
             const isAvailable = isDone || prevDone;
             const levelDiff = avg - mt.recLevel;
             const diffColor = levelDiff >= 2 ? "var(--success)" : levelDiff >= 0 ? "var(--accent)" : levelDiff >= -2 ? "var(--warning)" : "var(--danger)";
             const diffLabel = levelDiff >= 2 ? "Easy" : levelDiff >= 0 ? "Fair" : levelDiff >= -2 ? "Hard" : "Brutal";
 
             return (<div className={`mission-card${!isAvailable?" mission-locked":""}`} key={mt.id} onClick={()=>isAvailable&&startMission(mt)}
-              style={{borderLeftWidth:3,borderLeftStyle:"solid",borderLeftColor:isDone?"var(--success)":isAvailable?"var(--border2)":"var(--border)",marginLeft:8,opacity:isAvailable?1:0.4,cursor:isAvailable?"pointer":"default"}}>
+              style={{borderLeftWidth:3,borderLeftStyle:"solid",borderLeftColor:isDone?"var(--success)":isAvailable?"var(--border2)":"var(--border)",opacity:isAvailable?1:0.4,cursor:isAvailable?"pointer":"default"}}>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 {isDone && <span style={{color:"var(--success)",fontSize:13,fontWeight:700}}>✓</span>}
                 {!isDone && !isAvailable && <span style={{color:"var(--text2)",fontSize:12}}>🔒</span>}
@@ -67,30 +119,68 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
                 <span>Rec L{mt.recLevel}</span>
                 {timesCleared > 0 && <span style={{color:"var(--text2)"}}>x{timesCleared}</span>}
               </div>
+              {isAvailable && hasUnreadIntelForMission(mt.id, game.storyBeatsRead || {}, game.missionsCompleted) && (
+                <div className="mission-intel-warning">📡 Unread intel may be relevant</div>
+              )}
             </div>);
           })}
-
-          {!isUnlocked && (<div style={{marginLeft:8,padding:"8px 10px",border:"1px dashed var(--border)",borderRadius:6,fontSize:"var(--font-xs)",color:"var(--text2)",fontStyle:"italic"}}>
-            Complete all {chapterOrder[chapterOrder.indexOf(chId)-1] && STORY_CHAPTERS.find(c=>c.id===chapterOrder[chapterOrder.indexOf(chId)-1])?.title} missions to unlock
-          </div>)}
-        </div>);
-      })}
+        </div>
+      ) : (
+        <div style={{padding:"16px",border:"1px dashed var(--border)",borderRadius:6,fontSize:"var(--font-xs)",color:"var(--text2)",textAlign:"center",fontStyle:"italic"}}>
+          Complete previous chapter missions to unlock
+        </div>
+      )}
     </div>);
   }
 
+  const isExploring = mission.phase === "exploration";
+  const isCombat = mission.phase === "combat";
+  const showMap = isExploring || isCombat; // Keep Phaser alive during combat (hidden)
+
   return (<div className="mission-layout">
-    <BattleScene
-      squad={game.squad}
-      enemies={mission.enemies}
-      animation={animation}
-      currentEncounter={mission.currentEncounter}
-      totalEncounters={mission.totalEncounters}
-      roundNum={mission.roundNum}
-      combatLog={combatLog}
-      logRef={logRef}
-      missionTypeName={mission.type.name}
-      environment={mission.environment}
-    />
+    {/* Exploration map — visible during exploration, hidden (but alive) during combat */}
+    {showMap && mapData && (
+      <div style={{ display: isExploring ? "block" : "none" }}>
+        <PhaserGame
+          mapData={mapData}
+          eventBridge={eventBridge}
+          active={isExploring}
+          playerPos={playerPos}
+        />
+        {isExploring && (
+          <div style={{ textAlign: "center", padding: "8px 0", fontSize: "var(--font-xs)", color: "var(--text2)", fontFamily: "'Share Tech Mono', monospace" }}>
+            WASD / Arrow keys to move · Find the exit
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* Battle scene — only during active combat */}
+    {isCombat && (
+      <BattleScene
+        squad={game.squad}
+        enemies={mission.enemies}
+        turnState={turnState}
+        currentEncounter={mission.currentEncounter}
+        totalEncounters={mission.totalEncounters}
+        roundNum={mission.roundNum}
+        combatLog={combatLog}
+        logRef={logRef}
+        missionTypeName={mission.type.name}
+        environment={mission.environment}
+        stims={game.stims}
+        selectAttack={selectAttack}
+        selectDefend={selectDefend}
+        selectItem={selectItem}
+        chooseStim={chooseStim}
+        chooseTarget={chooseTarget}
+        cancelSelection={cancelSelection}
+        selectAbility={selectAbility}
+        chooseAbility={chooseAbility}
+        chooseAllyTarget={chooseAllyTarget}
+        lastAction={lastAction}
+      />
+    )}
     <div className="sticky-bar">
       {decision&&mission.phase==="decision"&&(
         <div className="decision-panel">
@@ -186,19 +276,36 @@ export default function MissionTab({ game, mission, combatLog, decision, mission
                 </div>
               );
             })()}
+            {mission.intelMods?.combatLogEntries?.length > 0 && (
+              <div className="intel-briefing">
+                <div className="intel-briefing-title">Active Intel</div>
+                {mission.intelMods.combatLogEntries.map((entry, i) => (
+                  <div key={i} className="intel-briefing-entry">{entry.text}</div>
+                ))}
+              </div>
+            )}
+            {mission.unreadIntel && (
+              <div className="mission-intel-warning" style={{marginTop:6}}>📡 Unread comms contain intel relevant to this mission</div>
+            )}
+            {mission.repMods && (mission.repMods.xpMultiplier > 1 || mission.repMods.allyDamageBonus > 0 || mission.repMods.enemyDamageBonus > 0) && (
+              <div className="rep-briefing">
+                <div className="rep-briefing-title">Reputation Effects</div>
+                {mission.repMods.xpMultiplier > 1 && <div className="rep-briefing-entry" style={{color:'var(--success)'}}>+{Math.round((mission.repMods.xpMultiplier - 1) * 100)}% XP (heroic reputation)</div>}
+                {mission.repMods.allyDamageBonus > 0 && <div className="rep-briefing-entry" style={{color:'var(--accent)'}}>+{Math.round(mission.repMods.allyDamageBonus * 100)}% squad damage (tactical reputation)</div>}
+                {mission.repMods.enemyDamageBonus > 0 && <div className="rep-briefing-entry" style={{color:'var(--danger)'}}>+{Math.round(mission.repMods.enemyDamageBonus * 100)}% enemy damage (ruthless reputation)</div>}
+                {mission.repMods.lootQualityBonus > 0 && <div className="rep-briefing-entry" style={{color:'var(--warning)'}}>+{mission.repMods.lootQualityBonus} loot rarity (ruthless reputation)</div>}
+              </div>
+            )}
           </div>
         )}
         {mission.phase==="briefing"&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceMission}>Begin Mission</button>}
-        {mission.phase==="combat"&&!decision&&!animation&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceMission}>Next Round ▸</button>}
-        {animation&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceAnimation}>Next ▸</button>}
-        {animation&&<button className="btn" onClick={skipAnimation}>Skip ▸▸</button>}
         {mission.phase==="result"&&mission.debriefPhase==="stats"&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceDebrief}>Continue</button>}
         {mission.phase==="result"&&mission.debriefPhase==="comms"&&(()=>{
           const beats = missionResult?.newBeats||[];
           const isLast = (mission.commsIndex||0) >= beats.length-1;
           return <button className="btn btn-primary" style={{flex:1}} onClick={advanceDebrief}>{isLast?"Return to Base":"Next ▸"}</button>;
         })()}
-        {mission.phase!=="result"&&<button className="btn btn-danger" onClick={resetMission}>Abort</button>}
+        {mission.phase==="briefing"&&<button className="btn btn-danger" onClick={resetMission}>Abort</button>}
       </div>
     </div>
   </div>);

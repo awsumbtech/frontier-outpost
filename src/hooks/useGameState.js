@@ -15,7 +15,7 @@ function initState() {
   s2.gear.armor = generateGear("armor", "RECON", 1);
   const es1 = getEffectiveStats(s1); s1.currentHp = es1.hp; s1.currentShield = es1.shield;
   const es2 = getEffectiveStats(s2); s2.currentHp = es2.hp; s2.currentShield = es2.shield;
-  return { squad: [s1, s2], inventory: [generateGear("gadget", null, 1), generateGear("implant", null, 1), generateGear("weapon", "ENGINEER", 1)], credits: 200, missionsCompleted: 0, storyBeatsRead: {}, stims: [{ ...STIM_TYPES[0] }, { ...STIM_TYPES[0] }], completedMissions: {}, decisionHistory: {}, memorial: [], settings: { stepThroughCombat: true } };
+  return { squad: [s1, s2], inventory: [generateGear("gadget", null, 1), generateGear("implant", null, 1), generateGear("weapon", "ENGINEER", 1)], credits: 200, missionsCompleted: 0, storyBeatsRead: {}, stims: [{ ...STIM_TYPES[0] }, { ...STIM_TYPES[0] }], completedMissions: {}, decisionHistory: {}, memorial: [], settings: {} };
 }
 
 export default function useGameState() {
@@ -30,7 +30,16 @@ export default function useGameState() {
   const loadGame = useCallback(async () => {
     try {
       const r = await window.storage.get("frontier-v2");
-      if (r?.value) { const d = JSON.parse(r.value); if (d.squad) { d.decisionHistory = d.decisionHistory || {}; d.memorial = d.memorial || []; d.squad = d.squad.map(o => ({ ...o, traits: o.traits || [] })); setGame(d); } }
+      if (r?.value) {
+        const d = JSON.parse(r.value);
+        // Save version gate: wipe old saves missing ability system fields
+        if (!d._saveVersion || d._saveVersion < 2) {
+          await window.storage.set("frontier-v2", "");
+          setShowIntro(true);
+          return;
+        }
+        if (d.squad) { d.decisionHistory = d.decisionHistory || {}; d.memorial = d.memorial || []; d.squad = d.squad.map(o => ({ ...o, traits: o.traits || [], currentResource: o.currentResource ?? 0, activeEffects: o.activeEffects || [] })); setGame(d); }
+      }
       else { setShowIntro(true); }
     } catch(e){ setShowIntro(true); }
   }, []);
@@ -42,7 +51,7 @@ export default function useGameState() {
     setShowIntro(true);
   }, []);
 
-  const saveGame = useCallback(async (s) => { try { await window.storage.set("frontier-v2", JSON.stringify(s)); } catch(e){} }, []);
+  const saveGame = useCallback(async (s) => { try { await window.storage.set("frontier-v2", JSON.stringify({ ...s, _saveVersion: 2 })); } catch(e){} }, []);
   const updateGame = useCallback((fn) => { setGame(prev => { const next = fn(prev); saveGame(next); return next; }); }, [saveGame]);
 
   function equipGear(opId, slot, gearId) {
@@ -92,7 +101,7 @@ export default function useGameState() {
   function dismissOp(opId) {
     updateGame(g => { const op = g.squad.find(o => o.id === opId); if (!op) return g;
       const inv = [...g.inventory]; for (const s of ["weapon","armor","implant","gadget"]) if (op.gear[s]) inv.push(op.gear[s]);
-      const memorial = [...(g.memorial || []), { name: op.name, classKey: op.classKey, icon: op.icon, traits: op.traits || [], reason: 'dismissed' }];
+      const memorial = [...(g.memorial || []), { name: op.name, classKey: op.classKey, icon: op.icon, spriteId: op.spriteId, color: op.color, traits: op.traits || [], reason: 'dismissed' }];
       return { ...g, squad: g.squad.filter(o => o.id !== opId), inventory: inv, memorial }; }); setSelectedOp(null);
   }
 
