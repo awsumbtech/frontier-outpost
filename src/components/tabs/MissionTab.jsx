@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { MISSIONS } from '../../data/missions';
 import { STORY_CHAPTERS } from '../../data/story';
 import { ENEMY_TEMPLATES } from '../../data/enemies';
-import { RARITY_NAMES, RARITY_COLORS } from '../../data/constants';
+import { RARITY_NAMES, RARITY_COLORS, REPUTATION_LABELS } from '../../data/constants';
+import { hasUnreadIntelForMission } from '../../engine/intel';
+import { computeReputation } from '../../engine/reputation';
 import BattleScene from '../combat/BattleScene';
 import PhaserGame from '../../phaser/PhaserGame';
 
@@ -53,8 +55,20 @@ export default function MissionTab({
     const activeChMissions = MISSIONS.filter(m => m.chapter === activeChapter);
     const isActiveUnlocked = unlockedChapters.has(activeChapter);
 
+    const rep = computeReputation(game.decisionHistory || {});
+    const hasRep = rep.heroic > 0 || rep.ruthless > 0 || rep.tactical > 0;
+
     return (<div>
-      <div style={{fontSize:"var(--font-xs)",color:"var(--text2)",marginBottom:8}}>Avg Level {avg} · {game.missionsCompleted} completed</div>
+      <div style={{fontSize:"var(--font-xs)",color:"var(--text2)",marginBottom:8}}>
+        Avg Level {avg} · {game.missionsCompleted} completed
+        {hasRep && <span className="reputation-summary">
+          {Object.entries(rep).filter(([,v]) => v > 0).map(([axis, val]) => (
+            <span key={axis} className="rep-badge" style={{color: REPUTATION_LABELS[axis].color, borderColor: REPUTATION_LABELS[axis].color + '40'}}>
+              {REPUTATION_LABELS[axis].icon} {REPUTATION_LABELS[axis].name} {val}
+            </span>
+          ))}
+        </span>}
+      </div>
 
       <div className="chapter-tabs">
         {chapterOrder.map((chId, ci) => {
@@ -105,6 +119,9 @@ export default function MissionTab({
                 <span>Rec L{mt.recLevel}</span>
                 {timesCleared > 0 && <span style={{color:"var(--text2)"}}>x{timesCleared}</span>}
               </div>
+              {isAvailable && hasUnreadIntelForMission(mt.id, game.storyBeatsRead || {}, game.missionsCompleted) && (
+                <div className="mission-intel-warning">📡 Unread intel may be relevant</div>
+              )}
             </div>);
           })}
         </div>
@@ -259,6 +276,26 @@ export default function MissionTab({
                 </div>
               );
             })()}
+            {mission.intelMods?.combatLogEntries?.length > 0 && (
+              <div className="intel-briefing">
+                <div className="intel-briefing-title">Active Intel</div>
+                {mission.intelMods.combatLogEntries.map((entry, i) => (
+                  <div key={i} className="intel-briefing-entry">{entry.text}</div>
+                ))}
+              </div>
+            )}
+            {mission.unreadIntel && (
+              <div className="mission-intel-warning" style={{marginTop:6}}>📡 Unread comms contain intel relevant to this mission</div>
+            )}
+            {mission.repMods && (mission.repMods.xpMultiplier > 1 || mission.repMods.allyDamageBonus > 0 || mission.repMods.enemyDamageBonus > 0) && (
+              <div className="rep-briefing">
+                <div className="rep-briefing-title">Reputation Effects</div>
+                {mission.repMods.xpMultiplier > 1 && <div className="rep-briefing-entry" style={{color:'var(--success)'}}>+{Math.round((mission.repMods.xpMultiplier - 1) * 100)}% XP (heroic reputation)</div>}
+                {mission.repMods.allyDamageBonus > 0 && <div className="rep-briefing-entry" style={{color:'var(--accent)'}}>+{Math.round(mission.repMods.allyDamageBonus * 100)}% squad damage (tactical reputation)</div>}
+                {mission.repMods.enemyDamageBonus > 0 && <div className="rep-briefing-entry" style={{color:'var(--danger)'}}>+{Math.round(mission.repMods.enemyDamageBonus * 100)}% enemy damage (ruthless reputation)</div>}
+                {mission.repMods.lootQualityBonus > 0 && <div className="rep-briefing-entry" style={{color:'var(--warning)'}}>+{mission.repMods.lootQualityBonus} loot rarity (ruthless reputation)</div>}
+              </div>
+            )}
           </div>
         )}
         {mission.phase==="briefing"&&<button className="btn btn-primary" style={{flex:1}} onClick={advanceMission}>Begin Mission</button>}

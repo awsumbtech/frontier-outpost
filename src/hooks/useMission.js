@@ -27,6 +27,8 @@ import {
 import { getEnvironmentForMission } from "../engine/environments";
 import { ANIM_DURATIONS, classifyAttackType } from "./useAnimationQueue";
 import { selectBark, selectBanter, getInlineStory, getDecisionEcho, getEnvFlavor, selectStoryReaction, selectDeathReaction } from "../engine/personality";
+import { computeReputation, getReputationCombatModifiers } from "../engine/reputation";
+import { getIntelCombatModifiers, hasUnreadIntelForMission } from "../engine/intel";
 import { generateMapForMission } from "../engine/mapgen";
 import EventBridge from "../phaser/EventBridge";
 
@@ -71,11 +73,39 @@ export default function useMission(game, setGame, updateGame, setTab) {
         const ne = m.currentEncounter + 1;
         const enemies = generateEncounter(m.type.tier, ne - 1);
 
+        // Apply intel weakness debuffs to matching enemies
+        const intelMods = m.intelMods;
+        if (intelMods && intelMods.damageBonus) {
+          for (const enemy of enemies) {
+            const bonus = intelMods.damageBonus[enemy.name];
+            if (bonus) {
+              if (!enemy.activeEffects) enemy.activeEffects = [];
+              enemy.activeEffects.push({
+                id: 'intelWeakness', type: 'debuff', stat: 'damageTaken',
+                modifier: bonus, remainingRounds: 99, source: 'intel',
+              });
+            }
+          }
+        }
+
+        // Apply reputation enemy damage bonus
+        const repMods = m.repMods;
+        if (repMods && repMods.enemyDamageBonus > 0) {
+          for (const enemy of enemies) {
+            if (!enemy.activeEffects) enemy.activeEffects = [];
+            enemy.activeEffects.push({
+              id: 'repAggression', type: 'buff', stat: 'damage',
+              modifier: repMods.enemyDamageBonus, remainingRounds: 99, source: 'reputation',
+            });
+          }
+        }
+
         barkBudgetRef.current = 2;
         recentBarksRef.current = [];
         const envFlavor = getEnvFlavor(m.environment?.id);
         const flavorEntry = envFlavor ? [{ text: envFlavor, type: "flavor" }] : [];
-        setCombatLog(p => [...p, ...flavorEntry, { text: `Encounter ${ne}/${m.totalEncounters}`, type: "round" }, { text: enemies.map(e => e.name).join(", "), type: "info" }]);
+        const intelLogEntries = (ne === 1 && intelMods?.combatLogEntries) ? intelMods.combatLogEntries : [];
+        setCombatLog(p => [...p, ...flavorEntry, ...intelLogEntries, { text: `Encounter ${ne}/${m.totalEncounters}`, type: "round" }, { text: enemies.map(e => e.name).join(", "), type: "info" }]);
 
         const newMission = { ...m, phase: "combat", enemies, currentEncounter: ne, roundNum: 0 };
 
@@ -93,10 +123,12 @@ export default function useMission(game, setGame, updateGame, setTab) {
         if (!m) return m;
         // Mission complete — calculate rewards
         const tm = m.type.tier;
-        const loot = Array.from({ length: rng(1, 2 + tm) }, () => generateGear(pick(["weapon","armor","implant","gadget"]), pick(CLASS_KEYS), game.squad[0]?.level || 1));
+        const baseLootCount = rng(1, 2 + tm) + (m.intelMods?.cacheBonus ? 1 : 0);
+        const loot = Array.from({ length: baseLootCount }, () => generateGear(pick(["weapon","armor","implant","gadget"]), pick(CLASS_KEYS), game.squad[0]?.level || 1));
         const isFirstClear = !game.completedMissions?.[m.type.id];
         const repeatPenalty = isFirstClear ? 1 : 0.5;
-        const xp = Math.round(50 * m.type.xpMult * tm * repeatPenalty * (1 + (m.xpBonus || 0)));
+        const repXpMult = m.repMods?.xpMultiplier || 1.0;
+        const xp = Math.round(50 * m.type.xpMult * tm * repeatPenalty * (1 + (m.xpBonus || 0)) * repXpMult);
         const creds = Math.round(rng(30, 60) * tm * repeatPenalty);
         const prevMC = m.prevMissionsCompleted;
         const newMC = prevMC + (isFirstClear ? 1 : 0);
@@ -587,7 +619,15 @@ export default function useMission(game, setGame, updateGame, setTab) {
 
     // Check for mid-round decision (every 3 rounds)
     if (ts.roundNum % 3 === 0) {
-      const evt = pick(DECISION_EVENTS);
+      let evt = pick(DECISION_EVENTS);
+      // Intel ambush upgrade: "Ambush Detected" → better version
+      if (evt.title === "Ambush Detected" && mission?.intelMods?.ambushUpgrade) {
+        evt = { ...evt, title: "Ambush Anticipated", desc: "Intel reveals their flanking positions. You have the advantage.", choices: [
+          { text: "Spring the trap", effect: "counterAmbush", desc: "+30% damage first round" },
+          { text: "Set crossfire positions", effect: "ambush", desc: "First strike + flanking bonus" },
+          { text: "Bypass entirely", effect: "avoid", desc: "Skip encounter safely" },
+        ]};
+      }
       setCombatLog(p => [...p, { text: `⟐ ${evt.title}`, type: "decision" }]);
       setDecision(evt);
       setMission(m => m ? { ...m, phase: "decision", roundNum: ts.roundNum } : m);
@@ -632,7 +672,14 @@ export default function useMission(game, setGame, updateGame, setTab) {
 
       // 60% chance of a decision event before returning to map
       if (Math.random() > 0.4) {
-        const evt = pick(DECISION_EVENTS);
+        let evt = pick(DECISION_EVENTS);
+        if (evt.title === "Ambush Detected" && m?.intelMods?.ambushUpgrade) {
+          evt = { ...evt, title: "Ambush Anticipated", desc: "Intel reveals their flanking positions. You have the advantage.", choices: [
+            { text: "Spring the trap", effect: "counterAmbush", desc: "+30% damage first round" },
+            { text: "Set crossfire positions", effect: "ambush", desc: "First strike + flanking bonus" },
+            { text: "Bypass entirely", effect: "avoid", desc: "Skip encounter safely" },
+          ]};
+        }
         setCombatLog(p => [...p, { text: `⟐ ${evt.title}`, type: "decision" }]);
         setDecision(evt);
         const banterResult = selectBanter(game.squad.filter(o => o.alive));
@@ -693,7 +740,13 @@ export default function useMission(game, setGame, updateGame, setTab) {
     const spawnEntity = map.entities.find(e => e.type === "spawn");
     setPlayerPos(spawnEntity ? { x: spawnEntity.x, y: spawnEntity.y } : null);
 
-    setMission({ type: mt, currentEncounter: 0, totalEncounters: mt.encounters, phase: "briefing", enemies: [], roundNum: 0, decisionApplied: {}, combatStats: { totalRounds: 0, enemiesKilled: 0, operativesDowned: 0 }, debriefPhase: null, prevMissionsCompleted: game.missionsCompleted, environment, mapSeed: map.seed });
+    // Compute reputation and intel modifiers for this mission
+    const reputation = computeReputation(game.decisionHistory || {});
+    const repMods = getReputationCombatModifiers(reputation);
+    const intelMods = getIntelCombatModifiers(mt.id, game.storyBeatsRead || {});
+    const unreadIntel = hasUnreadIntelForMission(mt.id, game.storyBeatsRead || {}, game.missionsCompleted);
+
+    setMission({ type: mt, currentEncounter: 0, totalEncounters: mt.encounters, phase: "briefing", enemies: [], roundNum: 0, decisionApplied: {}, combatStats: { totalRounds: 0, enemiesKilled: 0, operativesDowned: 0 }, debriefPhase: null, prevMissionsCompleted: game.missionsCompleted, environment, mapSeed: map.seed, reputation, repMods, intelMods, unreadIntel });
     const currentChapter = STORY_CHAPTERS.filter(ch => game.missionsCompleted >= ch.unlockAt).pop();
     const storyFlavor = currentChapter ? [{ text: `[${currentChapter.title}]`, type: "decision" }] : [];
     const inlineStoryEntries = getInlineStory(mt.id, 'preEncounter', 0).map(s => ({ text: `${s.sender}: ${s.text}`, type: "story" }));

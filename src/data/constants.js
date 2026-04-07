@@ -24,6 +24,26 @@ export const CLASS_RESOURCE_COLORS = {
   MEDIC: "#4ade80",
 };
 
+// Reputation axes — maps axis name to decision effect keys that increase it
+export const REPUTATION_AXES = {
+  heroic: ['rescue', 'mark', 'shields', 'fallBack'],
+  ruthless: ['pushThrough', 'quickLoot', 'overload', 'moveOn'],
+  tactical: ['counterAmbush', 'ambush', 'jam', 'carefulLoot'],
+};
+
+export const REPUTATION_LABELS = {
+  heroic: { name: 'Heroic', icon: '⚑', color: '#4ade80' },
+  ruthless: { name: 'Ruthless', icon: '⚡', color: '#f87171' },
+  tactical: { name: 'Tactical', icon: '◆', color: '#60a5fa' },
+};
+
+export const INTEL_TYPES = {
+  weakness: { name: 'Weakness', icon: '⚔', color: '#f59e0b' },
+  ambush: { name: 'Ambush Intel', icon: '👁', color: '#c084fc' },
+  cache: { name: 'Supply Cache', icon: '◈', color: '#4ade80' },
+  reinforcement: { name: 'Reinforcements', icon: '⚠', color: '#f87171' },
+};
+
 export const STATUS_EFFECTS = {
   bleed: { name: 'Bleed', type: 'dot', icon: '🩸', spriteId: 'bleed', desc: 'Takes damage each turn. Stacks up to 3x.', maxStacks: 3, damagePerStack: 5, duration: 3 },
   poison: { name: 'Poison', type: 'dot', icon: '☠', spriteId: 'poison', desc: 'Takes damage each turn. Halves healing received.', maxStacks: 1, damage: 8, duration: 3 },

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { STORY_CHAPTERS } from '../../data/story';
+import { INTEL_TYPES } from '../../data/constants';
 import SpriteIcon from '../../sprites/SpriteIcon';
 
 export default function CommsTab({ game, updateGame }) {
@@ -109,6 +110,11 @@ export default function CommsTab({ game, updateGame }) {
                     <span className="comms-mission-tag">M{beat.at}</span>
                   </div>
                   <div className="comms-beat-text">{beat.text}</div>
+                  {beat.intel && <div className="comms-intel-tag" style={{color: INTEL_TYPES[beat.intel.type]?.color || 'var(--accent)'}}>
+                    <span className="comms-intel-icon">{INTEL_TYPES[beat.intel.type]?.icon || '◆'}</span>
+                    <span className="comms-intel-label">{INTEL_TYPES[beat.intel.type]?.name || 'Intel'}</span>
+                    <span className="comms-intel-effect">{beat.intel.effect}</span>
+                  </div>}
                 </div>);
               })}
             </div>
